@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "classical_encoding"
+version = "0.1.0"
+description = "Python implementation of classical encoding algorithm, primarily for educational purpose, not performant."
+authors = ["PabloLION <36828324+PabloLION@users.noreply.github.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
