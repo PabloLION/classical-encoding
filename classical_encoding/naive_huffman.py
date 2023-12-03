@@ -26,6 +26,20 @@ def gen_huffman_tree(source: ByteSource) -> MetaSymbol:
     return symbol_freq[0][0]
 
 
+def show_huffman_dict(huffman_dict: dict[int, tuple[int, int]]):
+    # This is to test if the leading 1 is necessary
+    # turns out it is necessary, otherwise the length of the path will be wrong
+    # because huffman tree can have both leading "right"s and leading "left"s
+    # at the same time. Prefix-free: no whole code word that is a prefix of any
+    # other code word. So like "00, 01, 10, 11" is also a prefix code.
+    for symbol, (encoded, path_length) in huffman_dict.items():
+        path = encoded + (1 << path_length)
+        npl = max(1, encoded.bit_length())
+        if npl != path_length:
+            print(f"{npl=} != {path_length=}, for {encoded=:3d}, {path=:b}")
+        print(f"{symbol=:3d}, {encoded=:016b}, {path_length=}")
+
+
 def dict_from_huffman_tree(tree: MetaSymbol) -> dict[int, tuple[int, int]]:
     # left is 1, right is 0
     huffman_dict: dict[int, tuple[int, int]] = dict()
@@ -42,6 +56,8 @@ def dict_from_huffman_tree(tree: MetaSymbol) -> dict[int, tuple[int, int]]:
             dfs(node.right, (path << 1)) if node.right else None
 
     dfs(tree)
+    # cannot avoid adding the leading 1, tried with next line:
+    # show_huffman_dict(huffman_dict)
     return huffman_dict
 
 

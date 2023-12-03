@@ -40,9 +40,10 @@ class Bits(Sequence[bool]):
         self._length = length
 
     @classmethod
-    def from_int(cls, n: int, length: int) -> "Bits":
-        # #TODO: optional length
-        return Bits(n, length)
+    def from_int(cls, n: int, bit_length: int) -> "Bits":
+        # optional `bit_length` doesn't make sense, huffman tree can have
+        # both leading "right"s and leading "left"s at the same time
+        return Bits(n, bit_length)
 
     @classmethod
     def from_collection(cls, c: Collection[int | bool]) -> "Bits":

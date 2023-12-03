@@ -21,12 +21,10 @@ def int8_to_bytes(bits: Bits) -> bytearray:
 class BytePacker:
     bits: list[bool]
     packed: bytearray
-    seen: set[int]  # for safety check only
 
     def __init__(self):
         self.bits = list()
         self.packed = bytearray()
-        self.seen = set()
 
     def pack_bits(self, bits: Bits) -> None:
         self.bits.extend(bits)
@@ -34,13 +32,13 @@ class BytePacker:
             group_until = len(self.bits) - len(self.bits) % 8
             new_bytes = Bits.from_bools(self.bits[:group_until]).as_bytes()
             self.packed.extend(new_bytes)
-            self.seen.update(new_bytes)
             self.bits = self.bits[group_until:]
 
     def pack_int(self, n: int, bit_length: int) -> None:
-        # #TODO: optional bit_length
-        bits = Bits.from_int1s(n >> i & 1 for i in range(bit_length - 1, -1, -1))
-        return self.pack_bits(bits)
+        # optional `bit_length` doesn't make sense, huffman tree can have
+        # both leading "right"s and leading "left"s at the same time
+
+        return self.pack_bits(Bits.from_int(n, bit_length))
 
     # on end of packing, call this method to flush the remaining bits
     def flush(self, end_symbol: Bits | None = None) -> None:
