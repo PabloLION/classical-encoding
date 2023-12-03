@@ -1,15 +1,16 @@
 from itertools import zip_longest
 from typing import Counter
-from helper.basic_class import Bits, Source
-from helper.byte_tool import BytePacker
-from helper.tree import BinaryTree as MetaSymbol
+
+from classical_encoding.helper.basic_class import Bits, ByteSource
+from classical_encoding.helper.byte_tool import BytePacker
+from classical_encoding.helper.tree import BinaryTree as MetaSymbol
 
 
 def encoded_symbol(end_symbol: Bits, huffman_dict: dict[int, tuple[int, int]]) -> Bits:
     return Bits.from_int(*(huffman_dict[end_symbol.as_int()]))
 
 
-def gen_huffman_tree(source: Source) -> MetaSymbol:
+def gen_huffman_tree(source: ByteSource) -> MetaSymbol:
     # get frequency dict and legit end symbol
     freq = Counter(source.data)  # prob is not needed, freq is enough
     freq[source.end_symbol.as_int()] = 1
@@ -44,7 +45,7 @@ def dict_from_huffman_tree(tree: MetaSymbol) -> dict[int, tuple[int, int]]:
     return huffman_dict
 
 
-def naive_huffman_encode(source: Source) -> tuple[MetaSymbol, bytes]:
+def naive_huffman_encode(source: ByteSource) -> tuple[MetaSymbol, bytes]:
     ## regarding every byte as a symbol, there will be at most 256 symbols
     tree = gen_huffman_tree(source)
     d = dict_from_huffman_tree(tree)
@@ -75,7 +76,7 @@ def naive_huffman_decode(tree: MetaSymbol, encoded: bytes, end_symbol: Bits) -> 
     return bytes(decoded)
 
 
-def test_encode_decode_naive_huffman(source: Source):
+def test_encode_decode_naive_huffman(source: ByteSource):
     tree, encoded = naive_huffman_encode(source)
     decoded = naive_huffman_decode(
         tree, encoded, encoded_symbol(source.end_symbol, dict_from_huffman_tree(tree))
@@ -99,10 +100,13 @@ def test_naive_huffman():
     from random import randint
 
     sources = (
-        [Source(bytes([4] * 10 + [3] * 10 + [2] * 20 + [1] * 80 + [0] * 320))]
-        + [Source(bytes([randint(0, 255) for _ in range(9, 16)])) for _ in range(100)]
+        [ByteSource(bytes([4] * 10 + [3] * 10 + [2] * 20 + [1] * 80 + [0] * 320))]
         + [
-            Source(bytes([randint(0, 255) for _ in range(randint(100, 1000))]))
+            ByteSource(bytes([randint(0, 255) for _ in range(9, 16)]))
+            for _ in range(100)
+        ]
+        + [
+            ByteSource(bytes([randint(0, 255) for _ in range(randint(100, 1000))]))
             for _ in range(100)
         ]
     )

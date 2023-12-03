@@ -1,53 +1,70 @@
-from functools import cache
 from typing import (
     Iterable,
     Iterator,
     Sequence,
-    TypeVar,
     overload,
     Collection,
 )
 
 from classical_encoding.helper.constant import STABLE_EOT
 
-T = TypeVar("T", bound=Sequence)
-
 
 class Bits(Sequence[bool]):
+    """
+    A class to represent a sequence of bits. Use it as `tuple[bool, ...]` with
+    some extra methods.
+    """
+
     _data: int
     _length: int
-    _seq: Sequence[bool]
+    _seq: tuple[bool, ...]
+
+    @property
+    def data(self) -> int:
+        return self._data
 
     @property
     def length(self) -> int:
         return self._length
 
+    @property
+    def seq(self) -> tuple[bool, ...]:
+        if not hasattr(self, "_seq"):
+            self._seq = tuple(
+                bool(self.data >> i & 1) for i in range(self.length - 1, -1, -1)
+            )
+        return self._seq
+
     def __init__(self, data: int, length: int):
         self._data = data
         self._length = length
-        self._seq = [bool(data >> i & 1) for i in range(length - 1, -1, -1)]
 
     @classmethod
     def from_int(cls, n: int, length: int) -> "Bits":
+        # #TODO: optional length
         return Bits(n, length)
 
     @classmethod
+    def from_collection(cls, c: Collection[int | bool]) -> "Bits":
+        return Bits(sum(bit << (len(c) - 1 - i) for i, bit in enumerate(c)), len(c))
+
+    @classmethod
     def from_bools(cls, bits: Iterable[bool]) -> "Bits":
-        return cls.from_int1s([int(bit) for bit in bits])
+        # enough type gymnastics, cannot fix with all the following types
+        # Collection[bool] and Iterable[bool] > Sequence[bool] > list[bool]
+        return cls.from_collection(tuple(bits))
 
     @classmethod
     def from_int1s(cls, ints: Iterable[int]) -> "Bits":
-        _ints = tuple(ints)  # enough type gymnastics, all the following cannot fix
+        # enough type gymnastics, cannot fix with all the following types
         # Collection[int] and Iterable[int] > Sequence[int] > list[int]
-        return Bits(
-            sum(bit << (len(_ints) - 1 - i) for i, bit in enumerate(_ints)), len(_ints)
-        )
+        return cls.from_collection(tuple(ints))
 
-    def as_seq(self) -> Sequence[bool]:
-        return self._seq
+    def as_bools(self) -> tuple[bool, ...]:
+        return self.seq
 
     def as_int(self) -> int:
-        return self._data
+        return self.data
 
     def as_bytes(self) -> bytes:
         """Convert a Bits to a bytearray"""
@@ -69,20 +86,24 @@ class Bits(Sequence[bool]):
         ...
 
     @overload
-    def __getitem__(self, item: slice) -> Sequence[bool]:
+    def __getitem__(self, item: slice) -> tuple[bool, ...]:
         ...
 
-    def __getitem__(self, item: int | slice) -> bool | Sequence[bool]:
-        return self._seq[item]
+    def __getitem__(self, item: int | slice) -> bool | tuple[bool, ...]:
+        return self.seq[item]
 
     def __len__(self) -> int:
-        return self._length
+        return self.length
 
     def __iter__(self) -> Iterator[bool]:
-        return iter(self._seq)
+        return iter(self.seq)
 
 
-class Source:  # NamedTuple is less readable and flexible
+class ByteSource:  # NamedTuple is less readable and less flexible
+    """
+    Represent a source of bytes. Use it as `bytes` with some extra attributes.
+    """
+
     data: bytes
     _end_symbol: Bits
 
