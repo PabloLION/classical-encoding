@@ -99,10 +99,10 @@ def test_packer_with_bytes():
     source = bytearray(randint(0, 255) for _ in range(randint(100, 1000)))
     for byte in source:
         packer.pack_int(byte, 8)
-    packer.flush()
+    packer.flush()  # without EOT end symbol
 
     packed = packer.packed
-    unpacked = bytearray(packed)  # last two bytes are STABLE_EOT
+    unpacked = bytearray(packed)
     if len(source) != len(unpacked):
         raise ValueError(
             f"source length {len(source)} != unpacked length {len(unpacked)}"
