@@ -3,7 +3,7 @@ from typing import Counter
 
 from classical_encoding.helper.basic_class import Bits, ByteSource
 from classical_encoding.helper.byte_tool import BytePacker
-from classical_encoding.helper.tree import BinaryTree as MetaSymbol
+from classical_encoding.helper.tree import BinaryTreeNode as MetaSymbol
 
 
 def encoded_symbol(end_symbol: Bits, huffman_dict: dict[int, tuple[int, int]]) -> Bits:

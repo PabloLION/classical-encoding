@@ -3,17 +3,17 @@
 from typing import Optional
 
 
-class BinaryTree:
+class BinaryTreeNode:
     # binary tree node, known as MetaSymbol in Huffman coding
     value: Optional[int]
-    left: Optional["BinaryTree"]
-    right: Optional["BinaryTree"]
+    left: Optional["BinaryTreeNode"]
+    right: Optional["BinaryTreeNode"]
 
     def __init__(
         self,
         value: Optional[int] = None,
-        left: Optional["BinaryTree"] = None,
-        right: Optional["BinaryTree"] = None,
+        left: Optional["BinaryTreeNode"] = None,
+        right: Optional["BinaryTreeNode"] = None,
     ):
         self.left = left
         self.right = right
