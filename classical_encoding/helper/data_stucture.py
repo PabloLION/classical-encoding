@@ -230,8 +230,6 @@ class ExtendedRestrictedFastOrderedList[T]:
             raise ValueError("Instance already exists in the list")
 
         index = self.__fast_ordered_list.new_item()
-        print(self.__ordered_instances)
-        print(len(self.__ordered_instances))
         assert index == len(
             self.__ordered_instances
         ), f"{index=} != {len(self.__ordered_instances)=}, {self.__ordered_instances=}"
@@ -283,8 +281,8 @@ class SwappableNode[T]:
         value: T,
         parent: Optional["SwappableNode"] | None = None,
         birth_order: BirthOrder | None = None,
-        left: Optional["SwappableNode"] = None,
-        right: Optional["SwappableNode"] = None,
+        left: Optional["SwappableNode[T]"] = None,
+        right: Optional["SwappableNode[T]"] = None,
     ):
         self.value = value
         self.parent = parent if parent is not None else self
@@ -321,6 +319,12 @@ class SwappableNode[T]:
         else:
             other.parent.right = other
 
+    @staticmethod
+    def make_root(value: T) -> tuple["SwappableNode[T]", "SwappableNode[None]"]:
+        dummy_root = SwappableNode(None)  # dummy root is its own left child
+        root = SwappableNode(value, dummy_root, BIRTH_ORDER_RIGHT)
+        return root, dummy_root
+
 
 def test_restricted_fast_ordered_list():
     manager = RestrictedFastOrderedList()
@@ -339,6 +343,9 @@ def test_restricted_fast_ordered_list():
     manager.add_one(2)
     manager.add_one(2)
     manager.add_one(2)
+    assert manager.dict == {3: (1, 3), 4: (0, 1)}, f"{manager.dict=}"
+    assert manager.list == [4, 3, 3], f"{manager.list=}"
+
     # #TODO: add more test cases
 
     # Example showing error handling
@@ -348,6 +355,8 @@ def test_restricted_fast_ordered_list():
         pass  # print("\nExpected Error:", e)
     else:
         raise AssertionError("Expected IndexError")
+
+    print("restricted fast ordered list passed")
 
 
 def test_extended_restricted_fast_ordered_list():
@@ -378,10 +387,21 @@ def test_extended_restricted_fast_ordered_list():
     for _ in range(8):
         extended_manager.add_one(instance_c)
 
+    assert extended_manager.instance_weight == {
+        instance_a: 6,
+        instance_b: 3,
+        instance_c: 10,
+    }, f"{extended_manager.instance_weight=}"
+    assert extended_manager.ordered_instances == [
+        instance_c,
+        instance_a,
+        instance_b,
+    ]
+    print("extended restricted fast ordered list passed")
+
 
 def test_swappable_node():
-    dummy_root = SwappableNode(None)  # dummy root is its own left child
-    root = SwappableNode(0, dummy_root, BIRTH_ORDER_RIGHT)
+    root, _dummy_root = SwappableNode.make_root(0)
     node1 = SwappableNode(1, root, BIRTH_ORDER_LEFT)
     node2 = SwappableNode(2, root, BIRTH_ORDER_RIGHT)
     node3 = SwappableNode(3, node1, BIRTH_ORDER_LEFT)
