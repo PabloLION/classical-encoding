@@ -2,7 +2,7 @@ from collections import deque
 from typing import Iterator
 from typing_extensions import deprecated
 
-from classical_encoding.helper.basic_class import Bits
+from classical_encoding.helper.data_class import Bits
 
 
 @deprecated("Use ``Bits.as_bytes()`` instead")
