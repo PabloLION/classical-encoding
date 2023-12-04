@@ -1,6 +1,6 @@
 # for same issue as https://github.com/tiangolo/typer/issues/348,
 # still need to use Optional["BinaryTree"]
-from typing import Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 
 class BinaryTreeNode:
@@ -283,6 +283,7 @@ class SwappableNode[T]:
         birth_order: BirthOrder | None = None,
         left: Optional["SwappableNode[T]"] = None,
         right: Optional["SwappableNode[T]"] = None,
+        overwrite_parent_child: bool = False,
     ):
         self.value = value
         self.parent = parent if parent is not None else self
@@ -291,16 +292,9 @@ class SwappableNode[T]:
         self.right = right
 
         # Update parent's child references
-        if self.birth_order == BIRTH_ORDER_LEFT:
-            if self.parent.left is not None:
-                raise ValueError("Parent already has a left child")
-            self.parent.left = self
-        else:
-            if self.parent.right is not None:
-                raise ValueError("Parent already has a right child")
-            self.parent.right = self
+        self.parent.set_child(self.birth_order, self, overwrite=overwrite_parent_child)
 
-    def swap(self, other: "SwappableNode[T]"):
+    def swap_subtree(self, other: "SwappableNode[T]"):
         # Check if either node is the parent of the other
         if self.parent == other or other.parent == self:
             raise ValueError("Cannot swap a node with its direct parent")
@@ -310,20 +304,76 @@ class SwappableNode[T]:
         self.parent, other.parent = other.parent, self.parent
 
         # Update parent's child references
-        if self.birth_order == BIRTH_ORDER_LEFT:
-            self.parent.left = self
+        self.parent.set_child(self.birth_order, self, overwrite=True)
+        other.parent.set_child(other.birth_order, other, overwrite=True)
+
+    def get_child(self, birth_order: BirthOrder) -> Optional["SwappableNode[T]"]:
+        if birth_order == BIRTH_ORDER_LEFT:
+            return self.left
+        elif birth_order == BIRTH_ORDER_RIGHT:
+            return self.right
         else:
-            self.parent.right = self
-        if other.birth_order == BIRTH_ORDER_LEFT:
-            other.parent.left = other
+            raise ValueError("Invalid birth order")
+
+    def set_child(
+        self,
+        birth_order: BirthOrder,
+        child: Optional["SwappableNode[T]"],
+        *,
+        overwrite: bool = False,
+    ):
+        if birth_order == BIRTH_ORDER_LEFT:
+            if self.left is not None and not overwrite:
+                raise ValueError("Cannot overwrite left child")
+            self.left = child
+        elif birth_order == BIRTH_ORDER_RIGHT:
+            if self.right is not None and not overwrite:
+                raise ValueError("Cannot overwrite right child")
+            self.right = child
         else:
-            other.parent.right = other
+            raise ValueError("Invalid birth order")
+
+    def is_leaf(self) -> bool:
+        return self.left is None and self.right is None
 
     @staticmethod
     def make_root(value: T) -> tuple["SwappableNode[T]", "SwappableNode[None]"]:
         dummy_root = SwappableNode(None)  # dummy root is its own left child
         root = SwappableNode(value, dummy_root, BIRTH_ORDER_RIGHT)
         return root, dummy_root
+
+
+class NullableSwappableNode[T](SwappableNode[T | None]):
+    def extend(self, value: T) -> "NullableSwappableNode[T]":
+        """
+        Given a leaf node ``self``, extend it by placing a new SwappableNode
+        at its current position in the tree with two children:
+            - (left child:) move ``self`` as the left child of the new node
+            - (right child:) while making the new node's right child a new leaf
+        node with value ``value``.
+
+        Requires the type Generic[T] to be Optional[T] to allow the new empty
+        `SwappableNode` to be placed at the current position of the self-node.
+
+        Return the new leaf node with value ``value``.
+
+        Args:
+            value (T): The value of the new leaf node to be added.
+
+        Returns:
+            NullableSwappableNode[T]: The new leaf node with value ``value``.
+        """
+        assert self.is_leaf(), f"Can only extend a leaf node but {self=} is not leaf"
+        # Create a new node at the position of the current node ``self``
+        parent, birth_order = self.parent, self.birth_order
+        new_node = NullableSwappableNode(
+            None, parent, birth_order, self, None, overwrite_parent_child=True
+        )
+        self.parent, self.birth_order = new_node, BIRTH_ORDER_LEFT
+
+        # Create a new leaf node with value ``value``
+        new_leaf = NullableSwappableNode(value, new_node, BIRTH_ORDER_RIGHT)
+        return new_leaf
 
 
 def test_restricted_fast_ordered_list():
@@ -421,12 +471,12 @@ def test_swappable_node():
     _node17 = SwappableNode(17, node8, BIRTH_ORDER_LEFT)
     _node18 = SwappableNode(18, node8, BIRTH_ORDER_RIGHT)
     try:
-        node2.swap(node6)
+        node2.swap_subtree(node6)
     except ValueError:
         pass  # Expected "Cannot swap a node with its direct parent"
     else:
         raise AssertionError("Expected ValueError")
-    node2.swap(node7)
+    node2.swap_subtree(node7)
     assert node7.parent == root
     assert node7.birth_order == BIRTH_ORDER_RIGHT
     assert node2.parent == node3
@@ -441,7 +491,40 @@ def test_swappable_node():
     print("swap passed")
 
 
+def test_nullable_swappable_node():
+    root, _dummy_root = NullableSwappableNode.make_root(0)
+    node1 = NullableSwappableNode(1, root, BIRTH_ORDER_LEFT)
+    node2 = NullableSwappableNode(2, root, BIRTH_ORDER_RIGHT)
+    node3 = NullableSwappableNode(3, node1, BIRTH_ORDER_LEFT)
+    _node4 = NullableSwappableNode(4, node1, BIRTH_ORDER_RIGHT)
+    _node5 = NullableSwappableNode(5, node2, BIRTH_ORDER_LEFT)
+    node6 = NullableSwappableNode(6, node2, BIRTH_ORDER_RIGHT)
+    _node7 = NullableSwappableNode(7, node3, BIRTH_ORDER_LEFT)
+    node8 = NullableSwappableNode(8, node3, BIRTH_ORDER_RIGHT)
+    try:
+        node2.swap_subtree(node6)
+    except ValueError:
+        pass  # Expected "Cannot swap a node with its direct parent"
+    else:
+        raise AssertionError("Expected ValueError")
+
+    node9 = node8.extend(9)
+    meta_8_9 = node8.parent
+    assert node8.parent == node9.parent == meta_8_9
+    assert node8.value == 8
+    assert node9.value == 9
+    assert node8.birth_order == BIRTH_ORDER_LEFT
+    assert node9.birth_order == BIRTH_ORDER_RIGHT
+    assert meta_8_9.left == node8
+    assert meta_8_9.right == node9
+    assert node8.is_leaf()
+    assert node9.is_leaf()
+    assert not meta_8_9.is_leaf()
+    print("nullable swappable node passed")
+
+
 if __name__ == "__main__":
     test_restricted_fast_ordered_list()
     test_extended_restricted_fast_ordered_list()
     test_swappable_node()
+    test_nullable_swappable_node()
