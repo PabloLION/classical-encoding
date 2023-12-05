@@ -1,6 +1,7 @@
 # for same issue as https://github.com/tiangolo/typer/issues/348,
 # still need to use Optional["BinaryTree"]
 from typing import Iterable, Optional
+from venv import logger
 
 from classical_encoding.helper.data_class import Bits
 
@@ -63,7 +64,8 @@ class RestrictedFastOrderedList:
 
     def add_one(self, index: int) -> tuple[int, int]:
         """Increment the element at the given index by one and update the list
-        and dictionary.
+        and dictionary. The swapped value is the first integer with the same
+        value as the integer at the given index.
 
         Args:
             index (int): The index of the element to be incremented.
@@ -340,6 +342,7 @@ class SwappableNode[T]:
     def swap_with_subtree(self, other: "SwappableNode[T]"):
         # Check if either node is the parent of the other
         if self.parent == other or other.parent == self:
+            logger.debug(f"{self=}, {other=}, {self.is_root=}, {other.is_root=}")
             raise ValueError("Cannot swap a node with its direct parent")
 
         # Swap birth orders and parents
@@ -405,6 +408,12 @@ class SwappableNode[T]:
         dummy_root = cls(value)  # dummy root is its own left child
         root = cls(value, dummy_root, BIRTH_ORDER_RIGHT)
         return root, dummy_root
+
+    def __str__(self) -> str:
+        return f"T{self.value},({self.left},{self.right})"
+
+    def __repr__(self) -> str:
+        return f"T{self.value},({self.left},{self.right})"
 
 
 class NullableSwappableNode[T](SwappableNode[T | None]):
