@@ -1,6 +1,6 @@
 # for same issue as https://github.com/tiangolo/typer/issues/348,
 # still need to use Optional["BinaryTree"]
-from typing import TYPE_CHECKING, Iterable, Optional, Union, overload
+from typing import Iterable, Optional
 
 from classical_encoding.helper.data_class import Bits
 
@@ -400,15 +400,17 @@ class SwappableNode[T]:
     def is_root(self) -> bool:
         return self.parent.is_dummy_root
 
-    @staticmethod
-    def make_root(value: T) -> tuple["SwappableNode[T]", "SwappableNode[None]"]:
-        dummy_root = SwappableNode(None)  # dummy root is its own left child
-        root = SwappableNode(value, dummy_root, BIRTH_ORDER_RIGHT)
+    @classmethod
+    def make_root(cls, value: T) -> tuple["SwappableNode[T]", "SwappableNode[T]"]:
+        dummy_root = cls(value)  # dummy root is its own left child
+        root = cls(value, dummy_root, BIRTH_ORDER_RIGHT)
         return root, dummy_root
 
 
 class NullableSwappableNode[T](SwappableNode[T | None]):
     parent: "NullableSwappableNode[T]"
+    left: "NullableSwappableNode[T]"
+    right: "NullableSwappableNode[T]"
 
     def extend(self, value: T) -> "NullableSwappableNode[T]":
         """
@@ -444,15 +446,28 @@ class NullableSwappableNode[T](SwappableNode[T | None]):
     def _check(self) -> bool:
         return self.is_leaf ^ (self.value is None)
 
-    @staticmethod
+    @classmethod
     def make_root(
-        value: T,
+        cls, value: T | None
     ) -> tuple["NullableSwappableNode[T]", "NullableSwappableNode[T]"]:
-        ...
+        return super().make_root(value)  # type: ignore
+
+    # @staticmethod
+    # def make_root(
+    #     value: T,
+    # ) -> tuple["NullableSwappableNode[T]", "NullableSwappableNode[T]"]:
+
+    # "SwappableNode[T@NullableSwappableNode | None]" is incompatible with "NullableSwappableNode[T@NullableSwappableNode]
+    # #PROBLEM: these two types should be the same? I don't know how to
+    # overload the type hint of a method in a subclass
+    # Tried `@overload`, `T[U]=TypeVar("T",bound=SwappableNode[U])`, ...
+    # `return SwappableNode[T | None].make_root(value)`,
+    # method overriding, ...
 
     @property
     def parent_iter(self) -> Iterable["NullableSwappableNode[T]"]:
-        ...
+        return super().parent_iter  # type: ignore
+        # "SwappableNode[T@NullableSwappableNode | None]" is incompatible with "NullableSwappableNode[T@NullableSwappableNode]"
 
 
 def test_restricted_fast_ordered_list():
