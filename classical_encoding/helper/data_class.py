@@ -68,7 +68,7 @@ class Bits(Sequence[bool]):
         return self.data
 
     def as_bytes(self) -> bytes:
-        """Convert a Bits to a bytearray"""
+        """Convert a Bits to a bytes"""
         assert len(self) % 8 == 0
         return bytes(
             sum(bit << (7 - i) for i, bit in enumerate(self[j : j + 8]))  # Big Endian
@@ -98,6 +98,9 @@ class Bits(Sequence[bool]):
 
     def __iter__(self) -> Iterator[bool]:
         return iter(self.seq)
+
+    def __add__(self, other: "Bits") -> "Bits":  # __radd__ is not needed
+        return Bits(self.data << other.length | other.data, self.length + other.length)
 
 
 class ByteSource:  # NamedTuple is less readable and less flexible

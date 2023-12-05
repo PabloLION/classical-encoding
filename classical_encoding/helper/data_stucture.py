@@ -1,6 +1,8 @@
 # for same issue as https://github.com/tiangolo/typer/issues/348,
 # still need to use Optional["BinaryTree"]
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Iterable, Optional, Union, overload
+
+from classical_encoding.helper.data_class import Bits
 
 
 class BinaryTreeNode:
@@ -69,8 +71,7 @@ class RestrictedFastOrderedList:
         Returns:
             tuple[int, int]: The indices of the swapped pair (old index, new index)
         """
-        if index < 0 or index >= len(self.__l):
-            raise IndexError("Index out of range")
+        self._assert_range(index)
 
         old_value = self.__l[index]
         new_value = old_value + 1
@@ -93,8 +94,23 @@ class RestrictedFastOrderedList:
             self.__d[new_value] = (new_start, new_end + 1)
         else:
             self.__d[new_value] = (start, start + 1)
-
         return (index, start)
+
+    def get_first_same_weight(self, index: int) -> int:
+        """Get the first element with the same weight as the element at
+        the given index.
+
+        Args:
+            index (int): The index of the given element.
+
+        Returns:
+            int: The index of the first element with the same weight.
+        """
+        self._assert_range(index)
+
+        value = self.__l[index]
+        start, _end = self.__d[value]
+        return start
 
     def new_item(self) -> int:
         """Add a new element with value 0 to the list and return its index.
@@ -123,6 +139,10 @@ class RestrictedFastOrderedList:
             assert start == last_end
             assert self.__l[start:end] == [k] * (end - start)
             last_end = end
+
+    def _assert_range(self, index: int):
+        if index < 0 or index >= len(self.__l):
+            raise IndexError("Index out of range")
 
     def __len__(self) -> int:
         return len(self.__l)
@@ -180,6 +200,7 @@ class ExtendedRestrictedFastOrderedList[T]:
         self.__ordered_instances = []
         self.__fast_ordered_list = RestrictedFastOrderedList()
 
+    # todo: only return the swapped instance
     def add_one(self, instance: T) -> tuple[T, T]:
         """
         Increment the weight paired with the given instance by one and update
@@ -219,12 +240,15 @@ class ExtendedRestrictedFastOrderedList[T]:
         # return the swapped instances
         return (instance, swapped_instance)
 
-    def new_item(self, instance: T):
+    def new_item(self, instance: T) -> tuple[T, T]:
         """
         Add a new element with weight 0 paired with the given instance to the list.
 
         Args:
             instance (T): The instance to be added.
+
+        Returns:
+            tuple[T, T]: The two copies of the instance.
         """
         if instance in self.__instance_index:
             raise ValueError("Instance already exists in the list")
@@ -235,6 +259,22 @@ class ExtendedRestrictedFastOrderedList[T]:
         ), f"{index=} != {len(self.__ordered_instances)=}, {self.__ordered_instances=}"
         self.__instance_index[instance] = index
         self.__ordered_instances.append(instance)
+        return (instance, instance)
+
+    def get_first_same_weight(self, instance: T) -> T:
+        """Get the first instance with the same weight as the given instance.
+
+        Args:
+            instance (T): The given instance.
+
+        Returns:
+            T: The the first instance in the list with the same weight.
+        """
+        return self.__ordered_instances[
+            self.__fast_ordered_list.get_first_same_weight(
+                self.__instance_index[instance]
+            )
+        ]
 
     def _check(self):
         """Check if the list and dictionary are consistent."""
@@ -259,6 +299,9 @@ class ExtendedRestrictedFastOrderedList[T]:
 
     def __repr__(self):
         return "ExtendedRestrictedFastOrderedList(NOT_IMPLEMENTED)"
+
+    def __contains__(self, instance: T) -> bool:
+        return instance in self.__instance_index
 
 
 from typing import Optional, Literal
@@ -294,7 +337,7 @@ class SwappableNode[T]:
         # Update parent's child references
         self.parent.set_child(self.birth_order, self, overwrite=overwrite_parent_child)
 
-    def swap_subtree(self, other: "SwappableNode[T]"):
+    def swap_with_subtree(self, other: "SwappableNode[T]"):
         # Check if either node is the parent of the other
         if self.parent == other or other.parent == self:
             raise ValueError("Cannot swap a node with its direct parent")
@@ -333,8 +376,29 @@ class SwappableNode[T]:
         else:
             raise ValueError("Invalid birth order")
 
+    @property
+    def parent_iter(self) -> Iterable["SwappableNode[T]"]:
+        """The iter includes the root but not the current node"""
+        par = self.parent  # curr is not needed
+        while not par.is_dummy_root:  # <=> current is not root
+            yield par
+            par = par.parent
+
+    def get_path(self) -> list[int]:
+        path = [n.birth_order for n in self.parent_iter][:0:-1]
+        return path  # [:0:-1] reverse without path[0]
+
+    @property
     def is_leaf(self) -> bool:
         return self.left is None and self.right is None
+
+    @property
+    def is_dummy_root(self) -> bool:  # only the dummy root has this property
+        return self.parent == self
+
+    @property
+    def is_root(self) -> bool:
+        return self.parent.is_dummy_root
 
     @staticmethod
     def make_root(value: T) -> tuple["SwappableNode[T]", "SwappableNode[None]"]:
@@ -344,6 +408,8 @@ class SwappableNode[T]:
 
 
 class NullableSwappableNode[T](SwappableNode[T | None]):
+    parent: "NullableSwappableNode[T]"
+
     def extend(self, value: T) -> "NullableSwappableNode[T]":
         """
         Given a leaf node ``self``, extend it by placing a new SwappableNode
@@ -363,7 +429,7 @@ class NullableSwappableNode[T](SwappableNode[T | None]):
         Returns:
             NullableSwappableNode[T]: The new leaf node with value ``value``.
         """
-        assert self.is_leaf(), f"Can only extend a leaf node but {self=} is not leaf"
+        assert self.is_leaf, f"Can only extend a leaf node but {self=} is not leaf"
         # Create a new node at the position of the current node ``self``
         parent, birth_order = self.parent, self.birth_order
         new_node = NullableSwappableNode(
@@ -374,6 +440,19 @@ class NullableSwappableNode[T](SwappableNode[T | None]):
         # Create a new leaf node with value ``value``
         new_leaf = NullableSwappableNode(value, new_node, BIRTH_ORDER_RIGHT)
         return new_leaf
+
+    def _check(self) -> bool:
+        return self.is_leaf ^ (self.value is None)
+
+    @staticmethod
+    def make_root(
+        value: T,
+    ) -> tuple["NullableSwappableNode[T]", "NullableSwappableNode[T]"]:
+        ...
+
+    @property
+    def parent_iter(self) -> Iterable["NullableSwappableNode[T]"]:
+        ...
 
 
 def test_restricted_fast_ordered_list():
@@ -471,12 +550,12 @@ def test_swappable_node():
     _node17 = SwappableNode(17, node8, BIRTH_ORDER_LEFT)
     _node18 = SwappableNode(18, node8, BIRTH_ORDER_RIGHT)
     try:
-        node2.swap_subtree(node6)
+        node2.swap_with_subtree(node6)
     except ValueError:
         pass  # Expected "Cannot swap a node with its direct parent"
     else:
         raise AssertionError("Expected ValueError")
-    node2.swap_subtree(node7)
+    node2.swap_with_subtree(node7)
     assert node7.parent == root
     assert node7.birth_order == BIRTH_ORDER_RIGHT
     assert node2.parent == node3
@@ -502,7 +581,7 @@ def test_nullable_swappable_node():
     _node7 = NullableSwappableNode(7, node3, BIRTH_ORDER_LEFT)
     node8 = NullableSwappableNode(8, node3, BIRTH_ORDER_RIGHT)
     try:
-        node2.swap_subtree(node6)
+        node2.swap_with_subtree(node6)
     except ValueError:
         pass  # Expected "Cannot swap a node with its direct parent"
     else:
@@ -517,9 +596,9 @@ def test_nullable_swappable_node():
     assert node9.birth_order == BIRTH_ORDER_RIGHT
     assert meta_8_9.left == node8
     assert meta_8_9.right == node9
-    assert node8.is_leaf()
-    assert node9.is_leaf()
-    assert not meta_8_9.is_leaf()
+    assert node8.is_leaf
+    assert node9.is_leaf
+    assert not meta_8_9.is_leaf
     print("nullable swappable node passed")
 
 
