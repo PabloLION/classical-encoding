@@ -274,6 +274,8 @@ def test_adaptive_huffman_coding_no_packer():
             test_unit_adaptive_huffman_coding_no_packer(source)
         except Exception as e:
             logger.critical(f"failed with {source=} with error {e=}")
+            with open("failed_source.binary", "wb") as f:
+                f.write(source)
         else:
             n_passed += 1
     print(f"{n_passed=} / {n_test_case=}")
@@ -292,6 +294,14 @@ if __name__ == "__main__":
     from sys import set_int_max_str_digits
 
     set_int_max_str_digits(8000)
-    # test_unit_adaptive_huffman_coding_no_packer(source)
 
-    test_adaptive_huffman_coding_no_packer()
+    # with open("failed_source.binary", "rb") as f:
+    #     source = f.read()
+    logger.setLevel("DEBUG")
+    source = b"abcd abcd "
+    source = b"abc abc "
+    source = b"ab ab "
+    source = b"a a "
+    test_unit_adaptive_huffman_coding_no_packer(source)
+
+    # test_adaptive_huffman_coding_no_packer()
