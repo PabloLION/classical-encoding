@@ -8,6 +8,8 @@ from classical_encoding.helper.logger import logger
 from classical_encoding.helper.byte_tool import BytePacker
 from classical_encoding.helper.data_class import Bits, ByteSource
 from classical_encoding.helper.data_structure import (
+    BIRTH_ORDER_LEFT,
+    BIRTH_ORDER_RIGHT,
     ExtendedRestrictedFastOrderedList as OrderedList,
     NullableSwappableNode as MetaSymbol,
 )
@@ -99,6 +101,10 @@ class AdaptiveHuffmanEncoder:
         return result
 
 
+def format_bits_list(bits: list) -> str:
+    return "".join([str(int(b)) for b in bits])
+
+
 class AdaptiveHuffmanDecoder:
     nyt_node: MetaSymbol[int]
     root: MetaSymbol[int]
@@ -116,32 +122,51 @@ class AdaptiveHuffmanDecoder:
         Returns:
             int: decoded byte
         """
+        logger.setLevel("DEBUG")
         decoded = bytearray()
         curr = self.root  # root is needed in decoding
+        seen_bits = []  # for debugging
+        assert curr.is_root and not curr.is_dummy_root
+
         for b in bits:  # #TODO: kill indent with next(iter)
-            assert curr is not None
+            seen_bits.append(b)
+
+            # find the leaf node
+            assert curr is not None  # for type checker
             if not curr.is_leaf:
-                if b:
+                if b == BIRTH_ORDER_LEFT:
+                    curr = curr.left
+                elif b == BIRTH_ORDER_RIGHT:
                     curr = curr.right
                 else:
-                    curr = curr.left
+                    raise ValueError(f"unknown bit {b=}")
 
-            assert curr is not None
-            if not curr.is_leaf:
+                # continue no matter is leaf or not
+                # for the consistency of `byte_content`
+                # because the first byte is special
+                # assert curr is not None # for type checker
+                # if not curr.is_leaf:
                 continue
 
+            # now we are facing a leaf node
             is_new_byte = curr.value == NYT
             byte = 0  # will be overwritten
 
             if is_new_byte:
-                byte_content = [next(bits) for _ in range(8)]
+                byte_content = [b] + [next(bits) for _ in range(7)]
+                seen_bits.pop()  # remove the last bit, the current `b`
+                seen_bits.extend(byte_content)
                 byte = Bits.from_bools(byte_content).as_int()
 
             # #TODO: 9begin:reuse this block
             if is_new_byte:
+                logger.debug(
+                    f"new byte begin for {format_bits_list(seen_bits)} {byte=:3d} =0b{byte:08b}"
+                )
                 byte_node = self.nyt_node.extend(byte)
                 curr = self.nyt_node.parent
-                if curr == self.root:  # #TODO: do we need "self.root"?
+                if curr.is_root:  # #TODO: do we need "self.root"?
+                    logger.info("changing root for the first new byte")
                     self.root = curr  # #TODO: only first symbol needs this
                 # #TODO: this is not performant, for safe operations, we can add ..
                 # #TODO+ two nodes with weight 1 directly, NYT still has weight 0
@@ -150,26 +175,43 @@ class AdaptiveHuffmanDecoder:
                 # this order is important, curr comes before byte_node as its parent
                 self.ordered_list.new_item(byte_node)
                 self.ordered_list.add_one(byte_node)
-
+                curr = curr.parent  # finished adjusting new byte node and its parent
             else:  # decoding a known byte
                 byte = curr.value
                 assert byte is not None, f"{curr.is_leaf=} but its value is None"
 
-            par = curr.parent
-            while not par.is_dummy_root:  # par.is_dummy_root == curr.is_root:
+            # #NOTE: CANNOT use par here because par will change
+            # in the swap_with_subtree method
+            # curr, par = par, par.parent
+            while not curr.is_root:  # #FIX: is dummy root
+                # #NOTE:!! par.is_dummy_root != curr.is_root:
                 first_same_weight = self.ordered_list.get_first_same_weight(curr)
                 if first_same_weight != curr:
+                    logger.debug(f"swap {curr=} with {first_same_weight=}")
                     curr.swap_with_subtree(first_same_weight)
                 self.ordered_list.add_one(curr)
-                curr, par = par, par.parent
-            self.ordered_list.add_one(curr)  # curr is the root
+                curr = curr.parent
+
+            if not curr.is_dummy_root:
+                self.ordered_list.add_one(curr)
+            else:
+                curr = curr.right
+                logger.info(
+                    f"{curr=} is dummy root, should happen only at the first new byte"
+                )
             # #TODO :9end:reuse this block
 
             if not curr.is_root:
                 # #FIX: the result is not consistent here
                 logger.warning(f"{curr=} is not root")
-
             decoded.append(byte)
+            logger.info(
+                f"done decoding seen_bits={format_bits_list(seen_bits)} to {byte=:3d} ==0b_ {byte:08b}"
+            )
+            logger.debug(f"new nyt_node path: {self.nyt_node.get_path()}")
+            logger.debug(f"new tree: {self.root}")
+            seen_bits = []
+
         return bytes(decoded)
 
 
@@ -225,12 +267,12 @@ if __name__ == "__main__":
     source = b"abcddbb"
     expected_tree_status = [
         # TODO: deserialize the tree
-        "TNone:(T256:(,),T97:(,))",
-        "TNone:(TNone:(T256:(,),T98:(,)),T97:(,))",
-        "TNone:(T97:(,),TNone:(TNone:(T256:(,),T99:(,)),T98:(,)))",
-        "TNone:(TNone:(TNone:(T256:(,),T100:(,)),T99:(,)),TNone:(T97:(,),T98:(,)))",
-        "TNone:(TNone:(TNone:(T256:(,),T98:(,)),T99:(,)),TNone:(T97:(,),T100:(,)))",
-        "TNone:(TNone:(TNone:(T256:(,),T97:(,)),T99:(,)),TNone:(T98:(,),T100:(,)))",
-        "TNone:(T98:(,),TNone:(TNone:(TNone:(T256:(,),T97:(,)),T99:(,)),T100:(,)))",
+        "T[ROOT]None:(T256:(,),T97:(,))",
+        "T[ROOT]None:(TNone:(T256:(,),T98:(,)),T97:(,))",
+        "T[ROOT]None:(T97:(,),TNone:(TNone:(T256:(,),T99:(,)),T98:(,)))",
+        "T[ROOT]None:(TNone:(TNone:(T256:(,),T100:(,)),T99:(,)),TNone:(T97:(,),T98:(,)))",
+        "T[ROOT]None:(TNone:(TNone:(T256:(,),T98:(,)),T99:(,)),TNone:(T97:(,),T100:(,)))",
+        "T[ROOT]None:(TNone:(TNone:(T256:(,),T97:(,)),T99:(,)),TNone:(T98:(,),T100:(,)))",
+        "T[ROOT]None:(T98:(,),TNone:(TNone:(TNone:(T256:(,),T97:(,)),T99:(,)),T100:(,)))",
     ]
     test_adaptive_huffman_encoding_no_packer(source, expected_tree_status)

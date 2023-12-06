@@ -428,6 +428,8 @@ class SwappableNode[T]:
     def __str__(self) -> str:
         if self.is_dummy_root:
             return f"T[DUMMY]:(self,{self.right})"
+        if self.is_root:
+            return f"T[ROOT]{self.value}:({self.left},{self.right})"
         if self.is_leaf:
             return f"T{self.value}:(,)"
         return f"T{self.value}:({self.left},{self.right})"
