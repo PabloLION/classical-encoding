@@ -122,7 +122,6 @@ class AdaptiveHuffmanDecoder:
         Returns:
             int: decoded byte
         """
-        logger.setLevel("DEBUG")
         decoded = bytearray()
         curr = self.root  # root is needed in decoding
         seen_bits = []  # for debugging
@@ -227,7 +226,7 @@ def adaptive_huffman_encoding(source: ByteSource) -> tuple[bytearray, Bits]:
     return (packer.packed, source.end_symbol)
 
 
-def test_adaptive_huffman_encoding_no_packer(
+def test_unit_adaptive_huffman_coding_no_packer(
     source: bytes, expected_tree_status: list[str] | None = None
 ):
     encoder = AdaptiveHuffmanEncoder()
@@ -240,25 +239,13 @@ def test_adaptive_huffman_encoding_no_packer(
             encoded += encoder.encode_byte(byte)
             assert str(encoder.root) == tree_state
     print(f"encoded test passed with {encoded=}")
-
     decoder = AdaptiveHuffmanDecoder()
     decoded = decoder.decode_bits(iter(encoded.as_bools()))
-    print(source)
-    print(decoded)
+    assert source == decoded, f"{source=} != {decoded=}"
 
 
-def test_adaptive_huffman_encoding_with_packer(source: bytes):
-    byte_source = ByteSource(b"abracadabra", Bits.from_bools([True] * 16))
-    transmitted, end_symbol = adaptive_huffman_encoding(byte_source)
-    decoder = AdaptiveHuffmanDecoder()
-    unpacked_encoded_bits = BytePacker.unpack_bytes_to_bits(transmitted, end_symbol)
-    decoded = decoder.decode_bits(unpacked_encoded_bits)
-    print(source)
-    print(decoded)
-
-
-if __name__ == "__main__":
-    logger.setLevel("INFO")
+def test_adaptive_huffman_coding_no_packer():
+    logger.setLevel("ERROR")
 
     source = b"abcddbb"
     expected_tree_status = [
@@ -271,6 +258,40 @@ if __name__ == "__main__":
         "T[ROOT]None:(TNone:(TNone:(T256:(,),T97:(,)),T99:(,)),TNone:(T98:(,),T100:(,)))",
         "T[ROOT]None:(T98:(,),TNone:(TNone:(TNone:(T256:(,),T97:(,)),T99:(,)),T100:(,)))",
     ]
-    test_adaptive_huffman_encoding_no_packer(source, expected_tree_status)
+    test_unit_adaptive_huffman_coding_no_packer(source, expected_tree_status)
     source = b"abracadabra"
-    test_adaptive_huffman_encoding_no_packer(source)
+    test_unit_adaptive_huffman_coding_no_packer(source)
+
+    # TODO: move to test util
+    from random import randint
+
+    n_test_case = 10
+    n_passed = 0
+    for _ in range(n_test_case):
+        source_len = randint(1_000, 10_000)
+        source = bytes([randint(0, 255) for _ in range(source_len)])
+        try:
+            test_unit_adaptive_huffman_coding_no_packer(source)
+        except Exception as e:
+            logger.critical(f"failed with {source=} with error {e=}")
+        else:
+            n_passed += 1
+    print(f"{n_passed=} / {n_test_case=}")
+
+
+def test_adaptive_huffman_encoding_with_packer(source: bytes):
+    byte_source = ByteSource(b"abracadabra", Bits.from_bools([True] * 16))
+    transmitted, end_symbol = adaptive_huffman_encoding(byte_source)
+    decoder = AdaptiveHuffmanDecoder()
+    unpacked_encoded_bits = BytePacker.unpack_bytes_to_bits(transmitted, end_symbol)
+    decoded = decoder.decode_bits(unpacked_encoded_bits)
+    assert source == decoded, f"{source=} != {decoded=}"
+
+
+if __name__ == "__main__":
+    from sys import set_int_max_str_digits
+
+    set_int_max_str_digits(8000)
+    # test_unit_adaptive_huffman_coding_no_packer(source)
+
+    test_adaptive_huffman_coding_no_packer()
