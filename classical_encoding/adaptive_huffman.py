@@ -24,13 +24,14 @@ def extracted(
     is_new_byte: bool,
     symbol: Byte,
     old_byte_curr: MetaSymbol[int],
-) -> MetaSymbol[int]:
+) -> tuple[MetaSymbol[int], MetaSymbol[int]]:
+    # returning byte_node, new curr
+
     self = encoder_or_decoder
     curr = old_byte_curr
 
     byte_node = MetaSymbol(symbol)  # only for is_new_byte, will be overwritten
 
-    # #TODO :9begin:reuse this block
     if is_new_byte:
         byte_node = self.nyt_node.extend(symbol)
         curr = self.nyt_node.parent
@@ -66,9 +67,8 @@ def extracted(
         curr = curr.right
         logger.info(f"{curr=} is dummy root, should happen only at the first new byte")
     # curr is the root
-    # #TODO: 9end:reuse this block
 
-    return byte_node
+    return byte_node, curr
 
 
 class AdaptiveHuffmanEncoder:
@@ -110,7 +110,7 @@ class AdaptiveHuffmanEncoder:
             curr = self.huffman_dict[symbol]
             encoded_symbol = Bits.from_int1s(curr.get_path())
 
-        byte_node = extracted(self, is_new_byte, symbol, curr)
+        byte_node, curr = extracted(self, is_new_byte, symbol, curr)
 
         if is_new_byte:
             self.huffman_dict[symbol] = byte_node
@@ -151,7 +151,7 @@ class AdaptiveHuffmanDecoder:
         for b in bits:  # #TODO: kill indent with next(iter)
             seen_bits.append(b)
             # find the leaf node
-            assert curr is not None  # for type checker
+            assert curr is not None  # for type checking
             if not curr.is_leaf:
                 if b == BIRTH_ORDER_LEFT:
                     curr = curr.left
@@ -159,8 +159,7 @@ class AdaptiveHuffmanDecoder:
                     curr = curr.right
                 else:
                     raise ValueError(f"unknown bit {b=}")
-
-            assert curr is not None  # for type checker
+            assert curr is not None  # for type checking
             if not curr.is_leaf:
                 continue
 
@@ -181,44 +180,7 @@ class AdaptiveHuffmanDecoder:
                 symbol = curr.value
                 assert symbol is not None, f"{curr.is_leaf=} but its value is None"
 
-            # #TODO: 9begin:reuse this block
-            if is_new_byte:
-                byte_node = self.nyt_node.extend(symbol)
-                curr = self.nyt_node.parent
-                if curr.is_root:  # #TODO: do we need "self.root"?
-                    logger.info("changing root for the first new byte")
-                    self.root = curr  # #TODO: only first symbol needs this
-                # #TODO: this is not performant, for safe operations, we can add ..
-                # #TODO+ two nodes with weight 1 directly, NYT still has weight 0
-                self.ordered_list.new_item(curr)
-                self.ordered_list.add_one(curr)
-                # this order is important, curr comes before byte_node as its parent
-                self.ordered_list.new_item(byte_node)
-                self.ordered_list.add_one(byte_node)
-                curr = curr.parent  # finished adjusting new byte node and its parent
-
-            # we have curr and decoded_symbol
-
-            # #NOTE: CANNOT use par here because par will change
-            # in the swap_with_subtree method
-            # curr, par = par, par.parent
-            while not curr.is_root:  # #FIX: is dummy root
-                # #NOTE:!! par.is_dummy_root != curr.is_root:
-                first_same_weight = self.ordered_list.get_first_same_weight(curr)
-                if first_same_weight != curr:
-                    logger.debug(f"swap {curr=} with {first_same_weight=}")
-                    curr.swap_with_subtree(first_same_weight)
-                self.ordered_list.add_one(curr)
-                curr = curr.parent
-
-            if not curr.is_dummy_root:
-                self.ordered_list.add_one(curr)
-            else:
-                curr = curr.right
-                logger.info(
-                    f"{curr=} is dummy root, should happen only at the first new byte"
-                )
-            # #TODO :9end:reuse this block
+            _, curr = extracted(self, is_new_byte, symbol, curr)
 
             if not curr.is_root:
                 # #FIX: the result is not consistent here
