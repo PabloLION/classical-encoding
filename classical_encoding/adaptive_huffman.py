@@ -127,10 +127,10 @@ class AdaptiveHuffmanDecoder:
         curr = self.root  # root is needed in decoding
         seen_bits = []  # for debugging
         assert curr.is_root and not curr.is_dummy_root
+        bits = iter([False] + list(bits))  # add a 0 at the beginning for first byte
 
         for b in bits:  # #TODO: kill indent with next(iter)
             seen_bits.append(b)
-
             # find the leaf node
             assert curr is not None  # for type checker
             if not curr.is_leaf:
@@ -141,11 +141,8 @@ class AdaptiveHuffmanDecoder:
                 else:
                     raise ValueError(f"unknown bit {b=}")
 
-                # continue no matter is leaf or not
-                # for the consistency of `byte_content`
-                # because the first byte is special
-                # assert curr is not None # for type checker
-                # if not curr.is_leaf:
+            assert curr is not None  # for type checker
+            if not curr.is_leaf:
                 continue
 
             # now we are facing a leaf node
@@ -153,7 +150,7 @@ class AdaptiveHuffmanDecoder:
             byte = 0  # will be overwritten
 
             if is_new_byte:
-                byte_content = [b] + [next(bits) for _ in range(7)]
+                byte_content = [next(bits) for _ in range(8)]
                 seen_bits.pop()  # remove the last bit, the current `b`
                 seen_bits.extend(byte_content)
                 byte = Bits.from_bools(byte_content).as_int()
@@ -263,7 +260,6 @@ def test_adaptive_huffman_encoding_with_packer(source: bytes):
 if __name__ == "__main__":
     logger.setLevel("INFO")
 
-    # source = b"abracadabra"
     source = b"abcddbb"
     expected_tree_status = [
         # TODO: deserialize the tree
@@ -276,3 +272,5 @@ if __name__ == "__main__":
         "T[ROOT]None:(T98:(,),TNone:(TNone:(TNone:(T256:(,),T97:(,)),T99:(,)),T100:(,)))",
     ]
     test_adaptive_huffman_encoding_no_packer(source, expected_tree_status)
+    source = b"abracadabra"
+    test_adaptive_huffman_encoding_no_packer(source)
