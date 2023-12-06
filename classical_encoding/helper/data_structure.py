@@ -388,8 +388,23 @@ class SwappableNode[T]:
             par = par.parent
 
     def get_path(self) -> list[int]:
-        path = [n.birth_order for n in self.parent_iter][:0:-1]
-        return path  # [:0:-1] reverse without path[0]
+        """
+        The path from the root to the current node.
+        """
+        if self.is_dummy_root or self.is_root:
+            return []
+        path = [n.birth_order for n in self.parent_iter][-2::-1] + [self.birth_order]
+        # [-2::-1]: reverse without the old last element
+        # I used [:0:-1]: reverse without old 0-th element
+        return path
+
+    def get_root[U: "SwappableNode"](self: U) -> U:
+        if self.is_dummy_root:
+            return self.right
+        if self.is_root:
+            return self
+        *_, root = self.parent_iter  # PEP 448, Python 3.5+
+        return root
 
     @property
     def is_leaf(self) -> bool:
@@ -401,6 +416,7 @@ class SwappableNode[T]:
 
     @property
     def is_root(self) -> bool:
+        # #TODO maybe also check `not self.is_dummy_root`
         return self.parent.is_dummy_root
 
     @classmethod
@@ -410,10 +426,14 @@ class SwappableNode[T]:
         return root, dummy_root
 
     def __str__(self) -> str:
-        return f"T{self.value},({self.left},{self.right})"
+        if self.is_dummy_root:
+            return f"T[DUMMY]:(self,{self.right})"
+        if self.is_leaf:
+            return f"T{self.value}:(,)"
+        return f"T{self.value}:({self.left},{self.right})"
 
     def __repr__(self) -> str:
-        return f"T{self.value},({self.left},{self.right})"
+        return str(self)  # #TODO: add more info
 
 
 class NullableSwappableNode[T](SwappableNode[T | None]):
