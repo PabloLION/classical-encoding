@@ -102,6 +102,9 @@ class Bits(Sequence[bool]):
     def __add__(self, other: "Bits") -> "Bits":  # __radd__ is not needed
         return Bits(self.data << other.length | other.data, self.length + other.length)
 
+    def __repr__(self) -> str:
+        return f"Bits({''.join('1' if bit else '0' for bit in self.seq)}={self.length}bit{self.data})"
+
 
 class ByteSource:  # NamedTuple is less readable and less flexible
     """
