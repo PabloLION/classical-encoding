@@ -55,6 +55,9 @@ class AdaptiveHuffmanTree:
         """
         Add a new symbol to the tree and adjust the ordered list for the tree.
         Return the new symbol node.
+        Note that the new symbol node and the NYT node share the same parent
+        extended meta symbol. And all three nodes are updated, start the update
+        from the parent of extended meta symbol if needed
         """
         symbol_node = self.nyt_node.extend(symbol)
         extended_meta_symbol = self.nyt_node.parent
@@ -65,10 +68,15 @@ class AdaptiveHuffmanTree:
         # order: parent extended_meta_symbol comes before child symbol_node
         self.ordered_list.new_item(symbol_node)
         self.ordered_list.add_one(symbol_node)
+        self.huffman_dict[symbol] = symbol_node
         return symbol_node
 
     def update_huffman_tree(self, starting_node: MetaSymbol[int]) -> MetaSymbol[int]:
-        # returning byte_node, new curr
+        """
+        Update the huffman tree and the ordered list from the starting node.
+        Return the root of the tree.
+        """
+
         curr = starting_node
         # we have curr and result here.
 
@@ -170,24 +178,22 @@ class AdaptiveHuffman:
         logger.debug(f"begin {symbol=:3d} =0b{symbol:08b}")
 
         if symbol not in huffman_tree:
-            encoded_symbol = Bits.from_int1s(
+            encoded = Bits.from_int1s(
                 huffman_tree.nyt_node.get_path()
-            ) + Bits.from_int(symbol, 8)
+            ) + Bits.from_int8(symbol)
             # encoded should use the NYT node's path before adding the new symbol
-            byte_node = huffman_tree.add_new_symbol(symbol)
+            _ = huffman_tree.add_new_symbol(symbol)
             curr = huffman_tree.nyt_node.parent.parent  # update tree from here
-            huffman_tree.huffman_dict[symbol] = byte_node
-
         else:
             curr = huffman_tree.huffman_dict[symbol]
-            encoded_symbol = Bits.from_int1s(curr.get_path())
+            encoded = Bits.from_int1s(curr.get_path())
 
         curr = huffman_tree.update_huffman_tree(curr)
 
-        logger.info(f"done encoding {symbol=:3d} ==0b_ {symbol:08b}, {encoded_symbol=}")
+        logger.info(f"done encoding {symbol=:3d} ==0b_ {symbol:08b}, {encoded=}")
         logger.debug(f"new nyt_node path: {huffman_tree.nyt_node.get_path()}")
         logger.debug(f"new tree: {huffman_tree.root}")
-        return encoded_symbol
+        return encoded
 
     @staticmethod
     def decode_bits(bits: Iterator[bool]) -> bytes:

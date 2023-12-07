@@ -46,6 +46,10 @@ class Bits(Sequence[bool]):
         return Bits(n, bit_length)
 
     @classmethod
+    def from_int8(cls, n: int) -> "Bits":
+        return Bits(n, 8)
+
+    @classmethod
     def from_collection(cls, c: Collection[int | bool]) -> "Bits":
         return Bits(sum(bit << (len(c) - 1 - i) for i, bit in enumerate(c)), len(c))
 
