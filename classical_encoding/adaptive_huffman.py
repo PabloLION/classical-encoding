@@ -24,22 +24,8 @@ class AdaptiveHuffmanTree:
     huffman_dict: dict[int, MetaSymbol[int]]  # symbol->node, check if symbol new
     ordered_list: OrderedList[MetaSymbol[int]]  # weight is managed by ordered_list
 
-    # TODO: 99: require first_symbol to be Byte.
-    def __init__(
-        self, first_symbol: Byte | None = None, nyt_value: int | None = None
-    ) -> None:
-        if not nyt_value:
-            nyt_value = NYT
-
+    def __init__(self, first_symbol: Byte, nyt_value: int = NYT) -> None:
         self.nyt_node, _ = MetaSymbol.make_root(nyt_value)
-        if not first_symbol:
-            self.root = self.nyt_node
-            self.ordered_list = OrderedList()
-            self.ordered_list.new_item(self.nyt_node)
-            self.huffman_dict = {NYT: self.nyt_node}
-            logger.error(f"empty tree created, {self.root=}")
-            return
-
         self.symbol_node = self.nyt_node.extend(first_symbol)
         self.root = self.nyt_node.parent
 
@@ -54,6 +40,19 @@ class AdaptiveHuffmanTree:
         # #TODO: 9:end: reuse this code
 
         self.huffman_dict = {NYT: self.nyt_node, first_symbol: self.symbol_node}
+
+    @classmethod
+    def __init_without_first_symbol__(
+        cls, nyt_value: int = NYT
+    ) -> "AdaptiveHuffmanTree":
+        self = cls.__new__(cls)
+        self.nyt_node, _ = MetaSymbol.make_root(nyt_value)
+        self.root = self.nyt_node
+        self.ordered_list = OrderedList()
+        self.ordered_list.new_item(self.nyt_node)
+        self.huffman_dict = {nyt_value: self.nyt_node}
+        logger.error(f"empty tree created, {self.root=}")
+        return self
 
     def add_new_symbol_and_return_nyt_parent(
         self, symbol: Byte
@@ -91,7 +90,7 @@ class AdaptiveHuffmanTree:
             curr = curr.parent
 
         self.ordered_list.add_one(curr)
-        # curr is the root
+        assert curr.is_root
         return curr
 
     def __contains__(self, symbol: int) -> bool:
