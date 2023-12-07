@@ -181,12 +181,8 @@ def format_bits_list(bits: list) -> str:
 
 
 class AdaptiveHuffmanDecoder:
-    huffman_tree: AdaptiveHuffmanTree
-
-    def __init__(self) -> None:
-        self.huffman_tree = AdaptiveHuffmanTree()
-
-    def decode_bits(self, bits: Iterator[bool]) -> bytes:
+    @staticmethod
+    def decode_bits(bits: Iterator[bool]) -> bytes:
         """Decode a byte.
         Args:
             bits (Bits): the bits to be decoded
@@ -195,8 +191,8 @@ class AdaptiveHuffmanDecoder:
         """
         first_symbol = Bits.from_bools([next(bits) for _ in range(8)]).as_int()
         decoded_bytes = bytearray([first_symbol])
-        self.huffman_tree = AdaptiveHuffmanTree(first_symbol, nyt_value=NYT)
-        curr = self.huffman_tree.root  # root is needed in decoding
+        huffman_tree = AdaptiveHuffmanTree(first_symbol, nyt_value=NYT)
+        curr = huffman_tree.root  # root is needed in decoding
         seen_bits = []  # for debugging
 
         for b in bits:  # #TODO: kill indent with next(iter)
@@ -221,12 +217,12 @@ class AdaptiveHuffmanDecoder:
                 logger.debug(
                     f"new byte begin for {format_bits_list(seen_bits)} {symbol=:3d} =0b{symbol:08b}"
                 )
-                _, curr = self.huffman_tree.add_new_symbol_and_return_nyt_parent(symbol)
+                _, curr = huffman_tree.add_new_symbol_and_return_nyt_parent(symbol)
             else:  # decoding a known byte
                 symbol = curr.value
                 assert symbol is not None, f"{curr.is_leaf=} but its value is None"
 
-            curr = self.huffman_tree.update_huffman_tree(curr)
+            curr = huffman_tree.update_huffman_tree(curr)
 
             if not curr.is_root:
                 # #FIX: the result is not consistent here
@@ -235,8 +231,8 @@ class AdaptiveHuffmanDecoder:
             logger.info(
                 f"done decoding seen_bits={format_bits_list(seen_bits)} to {symbol=:3d} ==0b_ {symbol:08b}"
             )
-            logger.debug(f"new nyt_node path: {self.huffman_tree.nyt_node.get_path()}")
-            logger.debug(f"new tree: {self.huffman_tree.root}")
+            logger.debug(f"new nyt_node path: {huffman_tree.nyt_node.get_path()}")
+            logger.debug(f"new tree: {huffman_tree.root}")
             seen_bits = []
 
         return bytes(decoded_bytes)
@@ -275,8 +271,7 @@ def test_unit_adaptive_huffman_coding_no_packer(
             )
 
     print(f"encoded test passed with {encoded=}")
-    decoder = AdaptiveHuffmanDecoder()
-    decoded = decoder.decode_bits(iter(encoded.as_bools()))
+    decoded = AdaptiveHuffmanDecoder.decode_bits(iter(encoded.as_bools()))
     assert source == decoded, f"{source=} != {decoded=}"
 
 
@@ -321,9 +316,8 @@ def test_adaptive_huffman_coding_no_packer():
 def test_adaptive_huffman_encoding_with_packer(source: bytes):
     byte_source = ByteSource(b"abracadabra", Bits.from_bools([True] * 16))
     transmitted, end_symbol = adaptive_huffman_encoding(byte_source)
-    decoder = AdaptiveHuffmanDecoder()
     unpacked_encoded_bits = BytePacker.unpack_bytes_to_bits(transmitted, end_symbol)
-    decoded = decoder.decode_bits(unpacked_encoded_bits)
+    decoded = AdaptiveHuffmanDecoder.decode_bits(unpacked_encoded_bits)
     assert source == decoded, f"{source=} != {decoded=}"
 
 
