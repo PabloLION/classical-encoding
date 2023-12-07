@@ -25,19 +25,12 @@ class AdaptiveHuffmanTree:
     ordered_list: OrderedList[MetaSymbol[int]]  # weight is managed by ordered_list
 
     def __init__(self, first_symbol: Byte, nyt_value: int = NYT) -> None:
+        # initialize the tree without the first symbol
         self.nyt_node, _ = MetaSymbol.make_root(nyt_value)
         self.ordered_list = OrderedList()
         self.ordered_list.new_item(self.nyt_node)
 
-        # #TODO: 9:start: reuse this code
-        symbol_node = self.nyt_node.extend(first_symbol)
-        self.root = symbol_node.parent
-        self.ordered_list.new_item(self.root)
-        self.ordered_list.add_one(self.root)
-        # this order is important, root comes before symbol_node as its parent
-        self.ordered_list.new_item(symbol_node)
-        self.ordered_list.add_one(symbol_node)
-        # #TODO: 9:end: reuse this code
+        symbol_node = self.add_new_symbol(first_symbol)
 
         self.root = self.nyt_node.parent
         self.huffman_dict = {NYT: self.nyt_node, first_symbol: symbol_node}
@@ -65,7 +58,6 @@ class AdaptiveHuffmanTree:
         Add a new symbol to the tree and adjust the ordered list for the tree.
         Return the new symbol node.
         """
-        # #TODO: 9:start: reuse this code
         symbol_node = self.nyt_node.extend(symbol)
         extended_meta_symbol = self.nyt_node.parent
         # #TODO: this is not performant, for safe operations, we can add ..
@@ -75,7 +67,6 @@ class AdaptiveHuffmanTree:
         # order: parent extended_meta_symbol comes before child symbol_node
         self.ordered_list.new_item(symbol_node)
         self.ordered_list.add_one(symbol_node)
-        # #TODO: 9:end: reuse this code
         return symbol_node
 
     def update_huffman_tree(self, starting_node: MetaSymbol[int]) -> MetaSymbol[int]:
