@@ -3,13 +3,11 @@ This is the implementation of FGK algorithm, which is the first and easier
 adaptive Huffman coding. Vitter's algorithm is more complicated and efficient
 but not necessary for this project.
 """
-from typing import TYPE_CHECKING, Iterator
+from typing import Iterator
 from classical_encoding.helper.logger import logger
 from classical_encoding.helper.byte_tool import BytePacker
 from classical_encoding.helper.data_class import Bits, ByteSource
 from classical_encoding.helper.data_structure import (
-    BIRTH_ORDER_LEFT,
-    BIRTH_ORDER_RIGHT,
     ExtendedRestrictedFastOrderedList as OrderedList,
     NullableSwappableNode as MetaSymbol,
 )
@@ -19,7 +17,7 @@ NYT = 256  # Not Yet Transmitted. One byte cannot hold; int for typing.
 Byte = int  # Literal[0,...,255]
 
 
-def is_new_byte_action(
+def add_new_symbol_and_return_nyt_parent(
     encoder_or_decoder: "AdaptiveHuffmanEncoder | AdaptiveHuffmanDecoder",
     nyt_node: MetaSymbol[int],
     symbol: Byte,
@@ -42,7 +40,7 @@ def is_new_byte_action(
     return symbol_node, curr
 
 
-def extracted(
+def update_huffman_tree(
     encoder_or_decoder: "AdaptiveHuffmanEncoder | AdaptiveHuffmanDecoder",
     starting_node: MetaSymbol[int],
 ) -> MetaSymbol[int]:
@@ -108,16 +106,16 @@ class AdaptiveHuffmanEncoder:
                 symbol, 8
             )
             # result is not byte_node.path in the next method, but current NYT node's path
-            curr = self.nyt_node  # will be overwritten
+            byte_node, curr = add_new_symbol_and_return_nyt_parent(
+                self, self.nyt_node, symbol
+            )
+            self.huffman_dict[symbol] = byte_node
+
         else:
             curr = self.huffman_dict[symbol]
             encoded_symbol = Bits.from_int1s(curr.get_path())
 
-        if is_new_byte:
-            byte_node, curr = is_new_byte_action(self, self.nyt_node, symbol)
-            self.huffman_dict[symbol] = byte_node
-
-        curr = extracted(self, curr)
+        curr = update_huffman_tree(self, curr)
 
         logger.info(f"done encoding {symbol=:3d} ==0b_ {symbol:08b}, {encoded_symbol=}")
         logger.debug(f"new nyt_node path: {self.nyt_node.get_path()}")
@@ -163,7 +161,6 @@ class AdaptiveHuffmanDecoder:
 
             # now we are facing a leaf node
             is_new_byte = curr.value == NYT
-            symbol = 0  # will be overwritten
 
             if is_new_byte:
                 byte_content = [next(bits) for _ in range(8)]
@@ -174,13 +171,14 @@ class AdaptiveHuffmanDecoder:
                 logger.debug(
                     f"new byte begin for {format_bits_list(seen_bits)} {symbol=:3d} =0b{symbol:08b}"
                 )
+                _, curr = add_new_symbol_and_return_nyt_parent(
+                    self, self.nyt_node, symbol
+                )
             else:  # decoding a known byte
                 symbol = curr.value
                 assert symbol is not None, f"{curr.is_leaf=} but its value is None"
 
-            if is_new_byte:
-                _, curr = is_new_byte_action(self, curr, symbol)
-            curr = extracted(self, curr)
+            curr = update_huffman_tree(self, curr)
 
             if not curr.is_root:
                 # #FIX: the result is not consistent here
