@@ -25,31 +25,29 @@ class AdaptiveHuffmanTree:
     ordered_list: OrderedList[MetaSymbol[int]]  # weight is managed by ordered_list
 
     def __init__(self, first_symbol: Byte, nyt_value: int = NYT) -> None:
-        # initialize the tree without the first symbol
+        self.__initialize_all_attributes(nyt_value)  #  without first symbol
+        symbol_node = self.add_new_symbol(first_symbol)  # add the first symbol
+        # update the outdated attributes, only needed for the first symbol.
+        self.root = self.nyt_node.parent
+        self.huffman_dict = {nyt_value: self.nyt_node, first_symbol: symbol_node}
+
+    def __initialize_all_attributes(self, nyt_value: int = NYT) -> None:
+        """Initialize all attributes of the adaptive huffman tree"""
         self.nyt_node, _ = MetaSymbol.make_root(nyt_value)
+        self.root = self.nyt_node
         self.ordered_list = OrderedList()
         self.ordered_list.new_item(self.nyt_node)
-
-        symbol_node = self.add_new_symbol(first_symbol)
-
-        self.root = self.nyt_node.parent
-        self.huffman_dict = {NYT: self.nyt_node, first_symbol: symbol_node}
+        self.huffman_dict = {nyt_value: self.nyt_node}
 
     @classmethod
-    def __init_without_first_symbol__(
-        cls, nyt_value: int = NYT
-    ) -> "AdaptiveHuffmanTree":
+    def _init_without_first_symbol(cls, nyt_value: int = NYT) -> "AdaptiveHuffmanTree":
         """
         An alternative constructor for initializing an empty tree.
         Normally, we initialize the tree with the first symbol, but sometimes
         we need to initialize the tree without the first symbol.
         """
         self = cls.__new__(cls)
-        self.nyt_node, _ = MetaSymbol.make_root(nyt_value)
-        self.root = self.nyt_node
-        self.ordered_list = OrderedList()
-        self.ordered_list.new_item(self.nyt_node)
-        self.huffman_dict = {nyt_value: self.nyt_node}
+        self.__initialize_all_attributes(nyt_value)
         logger.error(f"empty tree created, {self.root=}")
         return self
 
@@ -203,7 +201,7 @@ class AdaptiveHuffman:
                 continue
 
             # now we are facing a leaf node
-            is_new_byte = curr.value == NYT
+            is_new_byte = curr == huffman_tree.nyt_node
 
             if is_new_byte:
                 byte_content = [next(bits) for _ in range(8)]
