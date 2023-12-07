@@ -24,6 +24,7 @@ class AdaptiveHuffmanTree:
     huffman_dict: dict[int, MetaSymbol[int]]  # symbol->node, check if symbol new
     ordered_list: OrderedList[MetaSymbol[int]]  # weight is managed by ordered_list
 
+    # TODO: 99: require first_symbol to be Byte.
     def __init__(
         self, first_symbol: Byte | None = None, nyt_value: int | None = None
     ) -> None:
@@ -98,14 +99,9 @@ class AdaptiveHuffmanTree:
 
 
 class AdaptiveHuffmanEncoder:
-    huffman_tree: AdaptiveHuffmanTree
-
-    def __init__(self) -> None:
-        self.huffman_tree = AdaptiveHuffmanTree()
-
+    @staticmethod
     def encode_bytes(
-        self,
-        bytes: Iterator[Byte],
+        bytes: Iterator[Byte],  # #TODO: also accept bytes
         tree_state_check: Callable[[str], bool] | None = None,
     ) -> Bits:
         """Encode a sequence of bytes."""
@@ -132,14 +128,17 @@ class AdaptiveHuffmanEncoder:
         #   - reduces the readability of the code.
         first_byte = next(bytes)
         encoded_bits = Bits.from_int(first_byte, 8)
-        self.huffman_tree = AdaptiveHuffmanTree(first_byte, nyt_value=NYT)
+        huffman_tree = AdaptiveHuffmanTree(first_byte, nyt_value=NYT)
         for byte in bytes:
-            encoded_bits += self.encode_byte(byte)
+            encoded_bits += AdaptiveHuffmanEncoder.encode_byte(huffman_tree, byte)
             if tree_state_check is not None:
-                tree_state_check(str(self.huffman_tree.root))
+                tree_state_check(str(huffman_tree.root))
         return encoded_bits
 
-    def encode_byte(self, symbol: int, byte_range_check: bool = True) -> Bits:
+    @staticmethod
+    def encode_byte(
+        huffman_tree: AdaptiveHuffmanTree, symbol: int, byte_range_check: bool = True
+    ) -> Bits:
         """Encode a byte.
         We get the result relatively early, but the main job is to update the
         tree and the ordered list.
@@ -150,33 +149,30 @@ class AdaptiveHuffmanEncoder:
         """
         if byte_range_check and (symbol < 0 or symbol > 255):
             raise ValueError("byte must be in range [0, 255].")
+        assert (
+            len(huffman_tree.huffman_dict) > 1
+        ), "huffman tree initialized without symbol"
 
         logger.debug(f"begin {symbol=:3d} =0b{symbol:08b}")
-        if len(self.huffman_tree.huffman_dict) == 1:  # reading first symbol
-            self.huffman_tree = AdaptiveHuffmanTree(symbol, nyt_value=NYT)
-            return Bits.from_int(symbol, 8)
-
-        is_new_byte = symbol not in self.huffman_tree
+        is_new_byte = symbol not in huffman_tree
 
         if is_new_byte:
             encoded_symbol = Bits.from_int1s(
-                self.huffman_tree.nyt_node.get_path()
+                huffman_tree.nyt_node.get_path()
             ) + Bits.from_int(symbol, 8)
             # result is not byte_node.path in the next method, but current NYT node's path
-            byte_node, curr = self.huffman_tree.add_new_symbol_and_return_nyt_parent(
-                symbol
-            )
-            self.huffman_tree.huffman_dict[symbol] = byte_node
+            byte_node, curr = huffman_tree.add_new_symbol_and_return_nyt_parent(symbol)
+            huffman_tree.huffman_dict[symbol] = byte_node
 
         else:
-            curr = self.huffman_tree.huffman_dict[symbol]
+            curr = huffman_tree.huffman_dict[symbol]
             encoded_symbol = Bits.from_int1s(curr.get_path())
 
-        curr = self.huffman_tree.update_huffman_tree(curr)
+        curr = huffman_tree.update_huffman_tree(curr)
 
         logger.info(f"done encoding {symbol=:3d} ==0b_ {symbol:08b}, {encoded_symbol=}")
-        logger.debug(f"new nyt_node path: {self.huffman_tree.nyt_node.get_path()}")
-        logger.debug(f"new tree: {self.huffman_tree.root}")
+        logger.debug(f"new nyt_node path: {huffman_tree.nyt_node.get_path()}")
+        logger.debug(f"new tree: {huffman_tree.root}")
         return encoded_symbol
 
 
@@ -253,10 +249,8 @@ def adaptive_huffman_encoding(source: ByteSource) -> tuple[bytearray, Bits]:
     Returns:
         Bits: encoded data
     """
-    encoder = AdaptiveHuffmanEncoder()
     packer = BytePacker()
-    for byte in source.data:
-        packer.pack_bits(encoder.encode_byte(byte))
+    packer.pack_bits(AdaptiveHuffmanEncoder.encode_bytes(iter(source.data)))
     packer.flush(source.end_symbol)  # #FIX: wrong here
     return (packer.packed, source.end_symbol)
 
@@ -264,20 +258,17 @@ def adaptive_huffman_encoding(source: ByteSource) -> tuple[bytearray, Bits]:
 def test_unit_adaptive_huffman_coding_no_packer(
     source: bytes, expected_tree_status: list[str] | None = None
 ):
-    encoder = AdaptiveHuffmanEncoder()
-
     if expected_tree_status is None:
-        encoded = encoder.encode_bytes(iter(source))
+        encoded = AdaptiveHuffmanEncoder.encode_bytes(iter(source))
     else:
         it = iter(expected_tree_status)
 
         def tree_state_check(tree_state: str) -> bool:
             expected = next(it)  # if `it` is exhausted, raise StopIteration
-            logger.error(f"checking {tree_state=}")
             assert tree_state == expected, f"{tree_state=} != {expected=}"
             return True
 
-        encoded = encoder.encode_bytes(iter(source), tree_state_check)
+        encoded = AdaptiveHuffmanEncoder.encode_bytes(iter(source), tree_state_check)
         if (n := next(it, None)) is not None:
             raise ValueError(
                 f"expected_tree_status should be completely consumed, but get next {n}"
