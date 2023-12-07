@@ -38,7 +38,7 @@ class AdaptiveHuffmanTree:
 
     def __init__(self, first_symbol: Byte, nyt_value: int = NYT) -> None:
         self.__initialize_all_attributes(nyt_value)  #  without first symbol
-        symbol_node = self.add_new_symbol(first_symbol)  # add the first symbol
+        symbol_node = self.add_symbol(first_symbol)  # add the first symbol
         # update the outdated attributes, only needed for the first symbol.
         self._root = self.nyt_node.parent
         self.__dict = {nyt_value: self.nyt_node, first_symbol: symbol_node}
@@ -63,7 +63,7 @@ class AdaptiveHuffmanTree:
         logger.error(f"empty tree created, {self._root=}")
         return self
 
-    def add_new_symbol(self, symbol: Byte) -> MetaSymbol[int]:
+    def add_symbol(self, symbol: Byte) -> MetaSymbol[int]:
         """
         Add a new symbol to the tree and adjust the ordered list for the tree.
         Return the new symbol node.
@@ -105,7 +105,7 @@ class AdaptiveHuffmanTree:
             curr = curr.parent
 
         self.__list.add_one(curr)
-        assert curr.is_root
+        assert curr.is_root  # update all parents of starting_node till root
         return curr
 
     def get_nyt_path(self) -> Bits:
@@ -199,7 +199,7 @@ class AdaptiveHuffman:
         if symbol not in huffman_tree:
             encoded = huffman_tree.get_nyt_path() + Bits.from_int8(symbol)
             # encoded should use the NYT node's path before adding the new symbol
-            _ = huffman_tree.add_new_symbol(symbol)
+            _ = huffman_tree.add_symbol(symbol)
             curr = huffman_tree.nyt_node.parent.parent  # update tree from here
         else:
             curr = huffman_tree[symbol]
@@ -237,27 +237,23 @@ class AdaptiveHuffman:
                 continue
 
             # now we are facing a leaf node
-
+            # decoding a new symbol because curr is NYT node
             if curr == huffman_tree.nyt_node:
                 byte_content = [next(bits) for _ in range(8)]
                 seen_bits.extend(byte_content)
                 symbol = Bits.from_bools(byte_content).as_int()
                 # do more afterwards
                 logger.info(
-                    f"new byte {symbol=:3d} ==0b_ {symbol:08b} in {format_bools(seen_bits)}"
+                    f"new {symbol=:3d} ==0b_ {symbol:08b} in {format_bools(seen_bits)}"
                 )
-                huffman_tree.add_new_symbol(symbol)
+                huffman_tree.add_symbol(symbol)
                 curr = huffman_tree.nyt_node.parent.parent  # update tree from here
-
-            else:  # decoding a known byte
+            else:  # decoding a seen symbol
                 symbol = curr.value
                 assert symbol is not None, f"{curr.is_leaf=} but its value is None"
 
-            curr = huffman_tree.update_huffman_tree(curr)
-
-            if not curr.is_root:
-                logger.warning(f"{curr=} is not root")
             decoded_bytes.append(symbol)
+            curr = huffman_tree.update_huffman_tree(curr)
             logger.info(
                 f"done decoding seen_bits={format_bools(seen_bits)} to {symbol=:3d} ==0b_ {symbol:08b}"
             )
@@ -299,10 +295,12 @@ def test_unit_adaptive_huffman_coding_no_packer(
             raise ValueError(
                 f"expected_tree_status should be completely consumed, but get next {n}"
             )
-
-    print(f"encoded test passed with {encoded=}")
+    print(f"encoded {source=} to {encoded=}")
     decoded = AdaptiveHuffman.decode_bits(iter(encoded.as_bools()))
+    print(f"decoded {encoded=} to {decoded=}")
+
     assert source == decoded, f"{source=} != {decoded=}"
+    print(f"encoded test passed with {source=} {decoded=}")
 
 
 def test_adaptive_huffman_coding_no_packer():
@@ -363,7 +361,7 @@ if __name__ == "__main__":
     # source = b"abcd abcd "
     # source = b"abc abc "
     # source = b"ab ab "
-    # source = b"a a "
+    # source = b"abab"
     # test_unit_adaptive_huffman_coding_no_packer(source)
 
     test_adaptive_huffman_coding_no_packer()
