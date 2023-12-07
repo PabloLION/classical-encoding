@@ -24,11 +24,31 @@ class AdaptiveHuffmanTree:
     huffman_dict: dict[int, MetaSymbol[int]]  # symbol->node, check if symbol new
     ordered_list: OrderedList[MetaSymbol[int]]  # weight is managed by ordered_list
 
-    def __init__(self, first_symbol) -> None:
-        self.root, _ = MetaSymbol.make_root(NYT)
-        self.nyt_node = self.root
+    def __init__(
+        self, first_symbol: Byte | None = None, nyt_value: int | None = None
+    ) -> None:
+        if not nyt_value:
+            nyt_value = NYT
+
+        self.nyt_node, _ = MetaSymbol.make_root(nyt_value)
+        if not first_symbol:
+            self.root = self.nyt_node
+            self.ordered_list = OrderedList()
+            self.ordered_list.new_item(self.nyt_node)
+            self.huffman_dict = {NYT: self.nyt_node}
+            return
+
+        self.symbol_node = self.nyt_node.extend(first_symbol)
+        self.root = self.nyt_node.parent
+
         self.ordered_list = OrderedList()
         self.ordered_list.new_item(self.nyt_node)
+        self.ordered_list.new_item(self.root)
+        self.ordered_list.add_one(self.root)
+        # this order is important, root comes before symbol_node as its parent
+        self.ordered_list.new_item(self.symbol_node)
+        self.ordered_list.add_one(self.symbol_node)
+
         self.huffman_dict = {NYT: self.nyt_node}
 
     def add_new_symbol_and_return_nyt_parent(
@@ -85,7 +105,7 @@ class AdaptiveHuffmanEncoder:
     huffman_tree: AdaptiveHuffmanTree
 
     def __init__(self) -> None:
-        self.huffman_tree = AdaptiveHuffmanTree(NYT)
+        self.huffman_tree = AdaptiveHuffmanTree()
 
     def encode_byte(self, symbol: int, byte_range_check: bool = True) -> Bits:
         """Encode a byte.
@@ -132,7 +152,7 @@ class AdaptiveHuffmanDecoder:
     huffman_tree: AdaptiveHuffmanTree
 
     def __init__(self) -> None:
-        self.huffman_tree = AdaptiveHuffmanTree(NYT)
+        self.huffman_tree = AdaptiveHuffmanTree()
 
     def decode_bits(self, bits: Iterator[bool]) -> bytes:
         """Decode a byte.
