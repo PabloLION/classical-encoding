@@ -98,7 +98,13 @@ class AdaptiveHuffmanTree:
         return symbol in self.huffman_dict
 
 
-class AdaptiveHuffmanEncoder:
+def format_bits_list(bits: list) -> str:
+    return "".join([str(int(b)) for b in bits])
+
+
+class AdaptiveHuffman:
+    """Gather functions for adaptive Huffman coding algorithm"""
+
     @staticmethod
     def encode_bytes(
         bytes: Iterator[Byte],  # #TODO: also accept bytes
@@ -130,7 +136,7 @@ class AdaptiveHuffmanEncoder:
         encoded_bits = Bits.from_int(first_byte, 8)
         huffman_tree = AdaptiveHuffmanTree(first_byte, nyt_value=NYT)
         for byte in bytes:
-            encoded_bits += AdaptiveHuffmanEncoder.encode_byte(huffman_tree, byte)
+            encoded_bits += AdaptiveHuffman.encode_byte(huffman_tree, byte)
             if tree_state_check is not None:
                 tree_state_check(str(huffman_tree.root))
         return encoded_bits
@@ -175,12 +181,6 @@ class AdaptiveHuffmanEncoder:
         logger.debug(f"new tree: {huffman_tree.root}")
         return encoded_symbol
 
-
-def format_bits_list(bits: list) -> str:
-    return "".join([str(int(b)) for b in bits])
-
-
-class AdaptiveHuffmanDecoder:
     @staticmethod
     def decode_bits(bits: Iterator[bool]) -> bytes:
         """Decode a byte.
@@ -246,7 +246,7 @@ def adaptive_huffman_encoding(source: ByteSource) -> tuple[bytearray, Bits]:
         Bits: encoded data
     """
     packer = BytePacker()
-    packer.pack_bits(AdaptiveHuffmanEncoder.encode_bytes(iter(source.data)))
+    packer.pack_bits(AdaptiveHuffman.encode_bytes(iter(source.data)))
     packer.flush(source.end_symbol)  # #FIX: wrong here
     return (packer.packed, source.end_symbol)
 
@@ -255,7 +255,7 @@ def test_unit_adaptive_huffman_coding_no_packer(
     source: bytes, expected_tree_status: list[str] | None = None
 ):
     if expected_tree_status is None:
-        encoded = AdaptiveHuffmanEncoder.encode_bytes(iter(source))
+        encoded = AdaptiveHuffman.encode_bytes(iter(source))
     else:
         it = iter(expected_tree_status)
 
@@ -264,14 +264,14 @@ def test_unit_adaptive_huffman_coding_no_packer(
             assert tree_state == expected, f"{tree_state=} != {expected=}"
             return True
 
-        encoded = AdaptiveHuffmanEncoder.encode_bytes(iter(source), tree_state_check)
+        encoded = AdaptiveHuffman.encode_bytes(iter(source), tree_state_check)
         if (n := next(it, None)) is not None:
             raise ValueError(
                 f"expected_tree_status should be completely consumed, but get next {n}"
             )
 
     print(f"encoded test passed with {encoded=}")
-    decoded = AdaptiveHuffmanDecoder.decode_bits(iter(encoded.as_bools()))
+    decoded = AdaptiveHuffman.decode_bits(iter(encoded.as_bools()))
     assert source == decoded, f"{source=} != {decoded=}"
 
 
@@ -317,7 +317,7 @@ def test_adaptive_huffman_encoding_with_packer(source: bytes):
     byte_source = ByteSource(b"abracadabra", Bits.from_bools([True] * 16))
     transmitted, end_symbol = adaptive_huffman_encoding(byte_source)
     unpacked_encoded_bits = BytePacker.unpack_bytes_to_bits(transmitted, end_symbol)
-    decoded = AdaptiveHuffmanDecoder.decode_bits(unpacked_encoded_bits)
+    decoded = AdaptiveHuffman.decode_bits(unpacked_encoded_bits)
     assert source == decoded, f"{source=} != {decoded=}"
 
 
