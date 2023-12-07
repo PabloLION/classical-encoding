@@ -19,6 +19,31 @@ NYT = 256  # Not Yet Transmitted. One byte cannot hold; int for typing.
 Byte = int  # Literal[0,...,255]
 
 
+def is_new_byte_action(
+    encoder_or_decoder: "AdaptiveHuffmanEncoder | AdaptiveHuffmanDecoder",
+    nyt_node: MetaSymbol[int],
+    symbol: Byte,
+):
+    self = encoder_or_decoder
+    old_nyt_node = nyt_node
+
+    byte_node = old_nyt_node.extend(symbol)
+    curr = old_nyt_node.parent
+    if curr.is_root:  # #TODO: do we need "self.root"?
+        logger.info("changing root for the first new byte")
+        self.root = curr  # #TODO: only first symbol needs this
+    # #TODO: this is not performant, for safe operations, we can add ..
+    # #TODO+ two nodes with weight 1 directly, NYT still has weight 0
+    self.ordered_list.new_item(curr)
+    self.ordered_list.add_one(curr)
+    # this order is important, curr comes before byte_node as its parent
+    self.ordered_list.new_item(byte_node)
+    self.ordered_list.add_one(byte_node)
+    curr = curr.parent  # finished adjusting new byte node and its parent
+
+    return byte_node, curr
+
+
 def extracted(
     encoder_or_decoder: "AdaptiveHuffmanEncoder | AdaptiveHuffmanDecoder",
     is_new_byte: bool,
@@ -33,20 +58,7 @@ def extracted(
     byte_node = MetaSymbol(symbol)  # only for is_new_byte, will be overwritten
 
     if is_new_byte:
-        byte_node = self.nyt_node.extend(symbol)
-        curr = self.nyt_node.parent
-        if curr.is_root:  # #TODO: do we need "self.root"?
-            logger.info("changing root for the first new byte")
-            self.root = curr  # #TODO: only first symbol needs this
-        # #TODO: this is not performant, for safe operations, we can add ..
-        # #TODO+ two nodes with weight 1 directly, NYT still has weight 0
-        self.ordered_list.new_item(curr)
-        self.ordered_list.add_one(curr)
-        # this order is important, curr comes before byte_node as its parent
-        self.ordered_list.new_item(byte_node)
-        self.ordered_list.add_one(byte_node)
-        curr = curr.parent  # finished adjusting new byte node and its parent
-
+        byte_node, curr = is_new_byte_action(self, curr, symbol)
     # we have curr and result here.
 
     # #NOTE: CANNOT use par here because par will change
@@ -145,7 +157,6 @@ class AdaptiveHuffmanDecoder:
         decoded_bytes = bytearray()
         curr = self.root  # root is needed in decoding
         seen_bits = []  # for debugging
-        assert curr.is_root and not curr.is_dummy_root
         bits = iter([False] + list(bits))  # add a 0 at the beginning for first byte
 
         for b in bits:  # #TODO: kill indent with next(iter)
@@ -153,12 +164,7 @@ class AdaptiveHuffmanDecoder:
             # find the leaf node
             assert curr is not None  # for type checking
             if not curr.is_leaf:
-                if b == BIRTH_ORDER_LEFT:
-                    curr = curr.left
-                elif b == BIRTH_ORDER_RIGHT:
-                    curr = curr.right
-                else:
-                    raise ValueError(f"unknown bit {b=}")
+                curr = curr.get_child(1 if b else 0)
             assert curr is not None  # for type checking
             if not curr.is_leaf:
                 continue
@@ -280,6 +286,7 @@ if __name__ == "__main__":
 
     set_int_max_str_digits(8000)
 
+    # edge cases:
     # with open("failed_source.binary", "rb") as f:
     #     source = f.read()
     # logger.setLevel("DEBUG")

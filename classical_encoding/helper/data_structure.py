@@ -353,7 +353,7 @@ class SwappableNode[T]:
         self.parent.set_child(self.birth_order, self, overwrite=True)
         other.parent.set_child(other.birth_order, other, overwrite=True)
 
-    def get_child(self, birth_order: BirthOrder) -> Optional["SwappableNode[T]"]:
+    def get_child[U: "SwappableNode"](self: U, birth_order: BirthOrder) -> Optional[U]:
         if birth_order == BIRTH_ORDER_LEFT:
             return self.left
         elif birth_order == BIRTH_ORDER_RIGHT:
