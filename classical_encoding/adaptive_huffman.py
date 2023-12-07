@@ -91,8 +91,24 @@ class AdaptiveHuffmanTree:
     def __contains__(self, symbol: int) -> bool:
         return symbol in self.huffman_dict
 
+    def __len__(self) -> int:
+        raise NotImplementedError(
+            "The length of a AdaptiveHuffmanTree is not well defined "
+            + "between counting only the leaves vs all the intermediate nodes "
+            + "in the tree. Use property `n_leaf` and `n_node` instead."
+        )
+
+    @property
+    def n_leaf(self) -> int:
+        return len(self.huffman_dict)
+
+    @property
+    def n_node(self) -> int:
+        return len(self.ordered_list)
+
 
 def format_bits_list(bits: list) -> str:
+    # helper for debugging
     return "".join([str(int(b)) for b in bits])
 
 
@@ -149,14 +165,11 @@ class AdaptiveHuffman:
         """
         if byte_range_check and (symbol < 0 or symbol > 255):
             raise ValueError("byte must be in range [0, 255].")
-        assert (
-            len(huffman_tree.huffman_dict) > 1
-        ), "huffman tree initialized without symbol"
-
+        if huffman_tree.n_leaf <= 1:  # tree has only one leaf: NYT node
+            raise ValueError("huffman tree not initialized with first symbol")
         logger.debug(f"begin {symbol=:3d} =0b{symbol:08b}")
-        is_new_byte = symbol not in huffman_tree
 
-        if is_new_byte:
+        if symbol not in huffman_tree:
             encoded_symbol = Bits.from_int1s(
                 huffman_tree.nyt_node.get_path()
             ) + Bits.from_int(symbol, 8)
@@ -221,7 +234,6 @@ class AdaptiveHuffman:
             curr = huffman_tree.update_huffman_tree(curr)
 
             if not curr.is_root:
-                # #FIX: the result is not consistent here
                 logger.warning(f"{curr=} is not root")
             decoded_bytes.append(symbol)
             logger.info(
