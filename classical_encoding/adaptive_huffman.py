@@ -3,7 +3,7 @@ This is the implementation of FGK algorithm, which is the first and easier
 adaptive Huffman coding. Vitter's algorithm is more complicated and efficient
 but not necessary for this project.
 """
-from typing import Iterator
+from typing import Callable, Iterator
 from classical_encoding.helper.logger import logger
 from classical_encoding.helper.byte_tool import BytePacker
 from classical_encoding.helper.data_class import Bits, ByteSource
@@ -19,7 +19,7 @@ Byte = int  # Literal[0,...,255]
 
 class AdaptiveHuffmanTree:
     # basically a ExtendedRestrictedFastOrderedList[NullableSwappableNode[int]]
-    root: MetaSymbol[int]  # the root of the huffman tree # #TODO: need?
+    root: MetaSymbol[int]  # the root of the huffman tree, for debugging
     nyt_node: MetaSymbol[int]  # the Not Yet Transmitted node
     huffman_dict: dict[int, MetaSymbol[int]]  # symbol->node, check if symbol new
     ordered_list: OrderedList[MetaSymbol[int]]  # weight is managed by ordered_list
@@ -102,6 +102,42 @@ class AdaptiveHuffmanEncoder:
 
     def __init__(self) -> None:
         self.huffman_tree = AdaptiveHuffmanTree()
+
+    def encode_bytes(
+        self,
+        bytes: Iterator[Byte],
+        tree_state_check: Callable[[str], bool] | None = None,
+    ) -> Bits:
+        """Encode a sequence of bytes."""
+        # The tree_state_check is the easiest and cleanest way I come up with
+        # to test the tree state during encoding.
+        # Considered Designs:
+        # 1. Return the tree state after the whole encoding process
+        #   - cannot see what's happening if there are exceptions in the middle
+        #       of the encoding process.
+        #   - will make the return type complicated when no check is needed.
+        # 2. Return a generator that yields the tree state after each byte and
+        #    return the encoded bits in the end.
+        #   - will make the return type hard to define as only the last element
+        #       is bits, and the rest are tree states.
+        #   - every time we call the function, we need to be careful about the
+        #      return type.
+        # 3. Write another function for testing the tree state.
+        #   - repeated code would also require us to change both functions when
+        #       we change the algorithm.
+        # 4. Use a global or class variable to store the tree state.
+        #   - not modularized.
+        # 5. Pass a list to compare the tree state.
+        #   - not flexible.
+        #   - reduces the readability of the code.
+        first_byte = next(bytes)
+        encoded_bits = Bits.from_int(first_byte, 8)
+        self.huffman_tree = AdaptiveHuffmanTree(first_byte, nyt_value=NYT)
+        for byte in bytes:
+            encoded_bits += self.encode_byte(byte)
+            if tree_state_check is not None:
+                tree_state_check(str(self.huffman_tree.root))
+        return encoded_bits
 
     def encode_byte(self, symbol: int, byte_range_check: bool = True) -> Bits:
         """Encode a byte.
@@ -229,16 +265,24 @@ def test_unit_adaptive_huffman_coding_no_packer(
     source: bytes, expected_tree_status: list[str] | None = None
 ):
     encoder = AdaptiveHuffmanEncoder()
-    encoded = Bits(0, 0)
+
     if expected_tree_status is None:
-        for byte in source:
-            encoded += encoder.encode_byte(byte)
+        encoded = encoder.encode_bytes(iter(source))
     else:
-        for byte, tree_state in zip(source, expected_tree_status, strict=True):
-            encoded += encoder.encode_byte(byte)
-            assert (
-                str(encoder.huffman_tree.root) == tree_state
-            ), f"{tree_state=} != {encoder.huffman_tree.root=}"
+        it = iter(expected_tree_status)
+
+        def tree_state_check(tree_state: str) -> bool:
+            expected = next(it)  # if `it` is exhausted, raise StopIteration
+            logger.error(f"checking {tree_state=}")
+            assert tree_state == expected, f"{tree_state=} != {expected=}"
+            return True
+
+        encoded = encoder.encode_bytes(iter(source), tree_state_check)
+        if (n := next(it, None)) is not None:
+            raise ValueError(
+                f"expected_tree_status should be completely consumed, but get next {n}"
+            )
+
     print(f"encoded test passed with {encoded=}")
     decoder = AdaptiveHuffmanDecoder()
     decoded = decoder.decode_bits(iter(encoded.as_bools()))
@@ -251,7 +295,7 @@ def test_adaptive_huffman_coding_no_packer():
     source = b"abcddbb"
     expected_tree_status = [
         # TODO: deserialize the tree
-        "T[ROOT]None:(T256:(,),T97:(,))",
+        # skip the tree initialized with one symbol "T[ROOT]None:(T256:(,),T97:(,))",
         "T[ROOT]None:(TNone:(T256:(,),T98:(,)),T97:(,))",
         "T[ROOT]None:(T97:(,),TNone:(TNone:(T256:(,),T99:(,)),T98:(,)))",
         "T[ROOT]None:(TNone:(TNone:(T256:(,),T100:(,)),T99:(,)),TNone:(T97:(,),T98:(,)))",
@@ -259,6 +303,7 @@ def test_adaptive_huffman_coding_no_packer():
         "T[ROOT]None:(TNone:(TNone:(T256:(,),T97:(,)),T99:(,)),TNone:(T98:(,),T100:(,)))",
         "T[ROOT]None:(T98:(,),TNone:(TNone:(TNone:(T256:(,),T97:(,)),T99:(,)),T100:(,)))",
     ]
+
     test_unit_adaptive_huffman_coding_no_packer(source, expected_tree_status)
     source = b"abracadabra"
     test_unit_adaptive_huffman_coding_no_packer(source)
@@ -294,7 +339,7 @@ def test_adaptive_huffman_encoding_with_packer(source: bytes):
 if __name__ == "__main__":
     from sys import set_int_max_str_digits
 
-    set_int_max_str_digits(8000)
+    set_int_max_str_digits(8000)  # TODO: if Bits too long, do not serialize.
 
     # edge cases:
     # with open("failed_source.binary", "rb") as f:
