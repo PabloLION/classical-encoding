@@ -26,20 +26,21 @@ class AdaptiveHuffmanTree:
 
     def __init__(self, first_symbol: Byte, nyt_value: int = NYT) -> None:
         self.nyt_node, _ = MetaSymbol.make_root(nyt_value)
-        self.symbol_node = self.nyt_node.extend(first_symbol)
-        self.root = self.nyt_node.parent
-
         self.ordered_list = OrderedList()
         self.ordered_list.new_item(self.nyt_node)
+
         # #TODO: 9:start: reuse this code
+        symbol_node = self.nyt_node.extend(first_symbol)
+        self.root = symbol_node.parent
         self.ordered_list.new_item(self.root)
         self.ordered_list.add_one(self.root)
         # this order is important, root comes before symbol_node as its parent
-        self.ordered_list.new_item(self.symbol_node)
-        self.ordered_list.add_one(self.symbol_node)
+        self.ordered_list.new_item(symbol_node)
+        self.ordered_list.add_one(symbol_node)
         # #TODO: 9:end: reuse this code
 
-        self.huffman_dict = {NYT: self.nyt_node, first_symbol: self.symbol_node}
+        self.root = self.nyt_node.parent
+        self.huffman_dict = {NYT: self.nyt_node, first_symbol: symbol_node}
 
     @classmethod
     def __init_without_first_symbol__(
@@ -64,9 +65,9 @@ class AdaptiveHuffmanTree:
         Add a new symbol to the tree and adjust the ordered list for the tree.
         Return the new symbol node.
         """
+        # #TODO: 9:start: reuse this code
         symbol_node = self.nyt_node.extend(symbol)
         extended_meta_symbol = self.nyt_node.parent
-        # #TODO: 9:start: reuse this code
         # #TODO: this is not performant, for safe operations, we can add ..
         # #TODO+ two nodes with weight 1 directly, NYT still has weight 0
         self.ordered_list.new_item(extended_meta_symbol)
