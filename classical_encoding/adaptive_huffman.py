@@ -25,10 +25,9 @@ def is_new_byte_action(
     symbol: Byte,
 ):
     self = encoder_or_decoder
-    old_nyt_node = nyt_node
 
-    byte_node = old_nyt_node.extend(symbol)
-    curr = old_nyt_node.parent
+    symbol_node = nyt_node.extend(symbol)
+    curr = nyt_node.parent
     if curr.is_root:  # #TODO: do we need "self.root"?
         logger.info("changing root for the first new byte")
         self.root = curr  # #TODO: only first symbol needs this
@@ -37,28 +36,21 @@ def is_new_byte_action(
     self.ordered_list.new_item(curr)
     self.ordered_list.add_one(curr)
     # this order is important, curr comes before byte_node as its parent
-    self.ordered_list.new_item(byte_node)
-    self.ordered_list.add_one(byte_node)
+    self.ordered_list.new_item(symbol_node)
+    self.ordered_list.add_one(symbol_node)
     curr = curr.parent  # finished adjusting new byte node and its parent
-
-    return byte_node, curr
+    return symbol_node, curr
 
 
 def extracted(
     encoder_or_decoder: "AdaptiveHuffmanEncoder | AdaptiveHuffmanDecoder",
-    is_new_byte: bool,
-    symbol: Byte,
-    old_byte_curr: MetaSymbol[int],
-) -> tuple[MetaSymbol[int], MetaSymbol[int]]:
+    starting_node: MetaSymbol[int],
+) -> MetaSymbol[int]:
     # returning byte_node, new curr
 
     self = encoder_or_decoder
-    curr = old_byte_curr
+    curr = starting_node
 
-    byte_node = MetaSymbol(symbol)  # only for is_new_byte, will be overwritten
-
-    if is_new_byte:
-        byte_node, curr = is_new_byte_action(self, curr, symbol)
     # we have curr and result here.
 
     # #NOTE: CANNOT use par here because par will change
@@ -79,8 +71,7 @@ def extracted(
         curr = curr.right
         logger.info(f"{curr=} is dummy root, should happen only at the first new byte")
     # curr is the root
-
-    return byte_node, curr
+    return curr
 
 
 class AdaptiveHuffmanEncoder:
@@ -122,10 +113,11 @@ class AdaptiveHuffmanEncoder:
             curr = self.huffman_dict[symbol]
             encoded_symbol = Bits.from_int1s(curr.get_path())
 
-        byte_node, curr = extracted(self, is_new_byte, symbol, curr)
-
         if is_new_byte:
+            byte_node, curr = is_new_byte_action(self, self.nyt_node, symbol)
             self.huffman_dict[symbol] = byte_node
+
+        curr = extracted(self, curr)
 
         logger.info(f"done encoding {symbol=:3d} ==0b_ {symbol:08b}, {encoded_symbol=}")
         logger.debug(f"new nyt_node path: {self.nyt_node.get_path()}")
@@ -186,7 +178,9 @@ class AdaptiveHuffmanDecoder:
                 symbol = curr.value
                 assert symbol is not None, f"{curr.is_leaf=} but its value is None"
 
-            _, curr = extracted(self, is_new_byte, symbol, curr)
+            if is_new_byte:
+                _, curr = is_new_byte_action(self, curr, symbol)
+            curr = extracted(self, curr)
 
             if not curr.is_root:
                 # #FIX: the result is not consistent here
