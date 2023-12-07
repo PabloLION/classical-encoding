@@ -19,25 +19,37 @@ Byte = int  # Literal[0,...,255]
 
 class AdaptiveHuffmanTree:
     # basically a ExtendedRestrictedFastOrderedList[NullableSwappableNode[int]]
-    root: MetaSymbol[int]  # the root of the huffman tree, for debugging
-    nyt_node: MetaSymbol[int]  # the Not Yet Transmitted node
-    huffman_dict: dict[int, MetaSymbol[int]]  # symbol->node, check if symbol new
-    ordered_list: OrderedList[MetaSymbol[int]]  # weight is managed by ordered_list
+    _root: MetaSymbol[int]  # the root of the huffman tree, for debugging
+
+    @property
+    def root(self) -> MetaSymbol[int]:
+        return self._root
+
+    _nyt_node: MetaSymbol[int]  # the Not Yet Transmitted node
+
+    @property
+    def nyt_node(self) -> MetaSymbol[int]:
+        return self._nyt_node
+
+    __dict: dict[int, MetaSymbol[int]]  # huffman dict, symbol->node, for new symbol
+    # #TODO: this dict should be write-once
+
+    __list: OrderedList[MetaSymbol[int]]  # weight is managed by ordered_list
 
     def __init__(self, first_symbol: Byte, nyt_value: int = NYT) -> None:
         self.__initialize_all_attributes(nyt_value)  #  without first symbol
         symbol_node = self.add_new_symbol(first_symbol)  # add the first symbol
         # update the outdated attributes, only needed for the first symbol.
-        self.root = self.nyt_node.parent
-        self.huffman_dict = {nyt_value: self.nyt_node, first_symbol: symbol_node}
+        self._root = self.nyt_node.parent
+        self.__dict = {nyt_value: self.nyt_node, first_symbol: symbol_node}
 
     def __initialize_all_attributes(self, nyt_value: int = NYT) -> None:
         """Initialize all attributes of the adaptive huffman tree"""
-        self.nyt_node, _ = MetaSymbol.make_root(nyt_value)
-        self.root = self.nyt_node
-        self.ordered_list = OrderedList()
-        self.ordered_list.new_item(self.nyt_node)
-        self.huffman_dict = {nyt_value: self.nyt_node}
+        self._nyt_node, _ = MetaSymbol.make_root(nyt_value)
+        self._root = self.nyt_node
+        self.__list = OrderedList()
+        self.__list.new_item(self.nyt_node)
+        self.__dict = {nyt_value: self.nyt_node}
 
     @classmethod
     def _init_without_first_symbol(cls, nyt_value: int = NYT) -> "AdaptiveHuffmanTree":
@@ -48,7 +60,7 @@ class AdaptiveHuffmanTree:
         """
         self = cls.__new__(cls)
         self.__initialize_all_attributes(nyt_value)
-        logger.error(f"empty tree created, {self.root=}")
+        logger.error(f"empty tree created, {self._root=}")
         return self
 
     def add_new_symbol(self, symbol: Byte) -> MetaSymbol[int]:
@@ -59,16 +71,16 @@ class AdaptiveHuffmanTree:
         extended meta symbol. And all three nodes are updated, start the update
         from the parent of extended meta symbol if needed
         """
-        symbol_node = self.nyt_node.extend(symbol)
-        extended_meta_symbol = self.nyt_node.parent
+        symbol_node = self._nyt_node.extend(symbol)
+        extended_meta_symbol = self._nyt_node.parent
         # #TODO: this is not performant, for safe operations, we can add ..
         # #TODO+ two nodes with weight 1 directly, NYT still has weight 0
-        self.ordered_list.new_item(extended_meta_symbol)
-        self.ordered_list.add_one(extended_meta_symbol)
+        self.__list.new_item(extended_meta_symbol)
+        self.__list.add_one(extended_meta_symbol)
         # order: parent extended_meta_symbol comes before child symbol_node
-        self.ordered_list.new_item(symbol_node)
-        self.ordered_list.add_one(symbol_node)
-        self.huffman_dict[symbol] = symbol_node
+        self.__list.new_item(symbol_node)
+        self.__list.add_one(symbol_node)
+        self.__dict[symbol] = symbol_node
         return symbol_node
 
     def update_huffman_tree(self, starting_node: MetaSymbol[int]) -> MetaSymbol[int]:
@@ -85,20 +97,20 @@ class AdaptiveHuffmanTree:
         # curr, par = par, par.parent
         while not curr.is_root:
             # #NOTE:!! par.is_dummy_root != curr.is_root:
-            first_same_weight = self.ordered_list.get_first_same_weight(curr)
+            first_same_weight = self.__list.get_first_same_weight(curr)
             if first_same_weight != curr:
                 logger.debug(f"swap {curr=} with {first_same_weight=}")
                 curr.swap_with_subtree(first_same_weight)
-            self.ordered_list.add_one(curr)
+            self.__list.add_one(curr)
             curr = curr.parent
 
-        self.ordered_list.add_one(curr)
+        self.__list.add_one(curr)
         assert curr.is_root
         return curr
 
     def get_nyt_path(self) -> Bits:
         """Get the path of the NYT node"""
-        return Bits.from_int1s(self.nyt_node.get_path())
+        return Bits.from_int1s(self._nyt_node.get_path())
 
     def __len__(self) -> int:
         raise NotImplementedError(
@@ -109,17 +121,17 @@ class AdaptiveHuffmanTree:
 
     @property
     def n_leaf(self) -> int:
-        return len(self.huffman_dict)
+        return len(self.__dict)
 
     @property
     def n_node(self) -> int:
-        return len(self.ordered_list)
+        return len(self.__list)
 
     def __contains__(self, symbol: int) -> bool:
-        return symbol in self.huffman_dict
+        return symbol in self.__dict
 
     def __getitem__(self, symbol: int) -> MetaSymbol[int]:
-        return self.huffman_dict[symbol]
+        return self.__dict[symbol]
 
 
 def format_bools(bits: list) -> str:
@@ -225,9 +237,8 @@ class AdaptiveHuffman:
                 continue
 
             # now we are facing a leaf node
-            is_new_byte = curr == huffman_tree.nyt_node
 
-            if is_new_byte:
+            if curr == huffman_tree.nyt_node:
                 byte_content = [next(bits) for _ in range(8)]
                 seen_bits.extend(byte_content)
                 symbol = Bits.from_bools(byte_content).as_int()
