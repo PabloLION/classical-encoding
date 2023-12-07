@@ -36,6 +36,7 @@ class AdaptiveHuffmanTree:
             self.ordered_list = OrderedList()
             self.ordered_list.new_item(self.nyt_node)
             self.huffman_dict = {NYT: self.nyt_node}
+            logger.error(f"empty tree created, {self.root=}")
             return
 
         self.symbol_node = self.nyt_node.extend(first_symbol)
@@ -43,13 +44,15 @@ class AdaptiveHuffmanTree:
 
         self.ordered_list = OrderedList()
         self.ordered_list.new_item(self.nyt_node)
+        # #TODO: 9:start: reuse this code
         self.ordered_list.new_item(self.root)
         self.ordered_list.add_one(self.root)
         # this order is important, root comes before symbol_node as its parent
         self.ordered_list.new_item(self.symbol_node)
         self.ordered_list.add_one(self.symbol_node)
+        # #TODO: 9:end: reuse this code
 
-        self.huffman_dict = {NYT: self.nyt_node}
+        self.huffman_dict = {NYT: self.nyt_node, first_symbol: self.symbol_node}
 
     def add_new_symbol_and_return_nyt_parent(
         self, symbol: Byte
@@ -57,9 +60,7 @@ class AdaptiveHuffmanTree:
         nyt_node = self.nyt_node
         symbol_node = nyt_node.extend(symbol)
         curr = nyt_node.parent
-        if curr.is_root:  # #TODO: do we need "self.root"?
-            logger.info("changing root for the first new byte")
-            self.root = curr  # #TODO: only first symbol needs this
+        # #TODO: 9:start: reuse this code
         # #TODO: this is not performant, for safe operations, we can add ..
         # #TODO+ two nodes with weight 1 directly, NYT still has weight 0
         self.ordered_list.new_item(curr)
@@ -67,6 +68,7 @@ class AdaptiveHuffmanTree:
         # this order is important, curr comes before byte_node as its parent
         self.ordered_list.new_item(symbol_node)
         self.ordered_list.add_one(symbol_node)
+        # #TODO: 9:end: reuse this code
         curr = curr.parent  # finished adjusting new byte node and its parent
         return symbol_node, curr
 
@@ -87,13 +89,7 @@ class AdaptiveHuffmanTree:
             self.ordered_list.add_one(curr)
             curr = curr.parent
 
-        if not curr.is_dummy_root:
-            self.ordered_list.add_one(curr)
-        else:
-            curr = curr.right
-            logger.info(
-                f"{curr=} is dummy root, should happen only at the first new byte"
-            )
+        self.ordered_list.add_one(curr)
         # curr is the root
         return curr
 
@@ -118,7 +114,11 @@ class AdaptiveHuffmanEncoder:
         """
         if byte_range_check and (symbol < 0 or symbol > 255):
             raise ValueError("byte must be in range [0, 255].")
+
         logger.debug(f"begin {symbol=:3d} =0b{symbol:08b}")
+        if len(self.huffman_tree.huffman_dict) == 1:  # reading first symbol
+            self.huffman_tree = AdaptiveHuffmanTree(symbol, nyt_value=NYT)
+            return Bits.from_int(symbol, 8)
 
         is_new_byte = symbol not in self.huffman_tree
 
@@ -161,10 +161,11 @@ class AdaptiveHuffmanDecoder:
         Returns:
             int: decoded byte
         """
-        decoded_bytes = bytearray()
+        first_symbol = Bits.from_bools([next(bits) for _ in range(8)]).as_int()
+        decoded_bytes = bytearray([first_symbol])
+        self.huffman_tree = AdaptiveHuffmanTree(first_symbol, nyt_value=NYT)
         curr = self.huffman_tree.root  # root is needed in decoding
         seen_bits = []  # for debugging
-        bits = iter([False] + list(bits))  # add a 0 at the beginning for first byte
 
         for b in bits:  # #TODO: kill indent with next(iter)
             seen_bits.append(b)
@@ -235,7 +236,9 @@ def test_unit_adaptive_huffman_coding_no_packer(
     else:
         for byte, tree_state in zip(source, expected_tree_status, strict=True):
             encoded += encoder.encode_byte(byte)
-            assert str(encoder.huffman_tree.root) == tree_state
+            assert (
+                str(encoder.huffman_tree.root) == tree_state
+            ), f"{tree_state=} != {encoder.huffman_tree.root=}"
     print(f"encoded test passed with {encoded=}")
     decoder = AdaptiveHuffmanDecoder()
     decoded = decoder.decode_bits(iter(encoded.as_bools()))
