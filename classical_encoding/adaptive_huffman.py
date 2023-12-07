@@ -96,8 +96,9 @@ class AdaptiveHuffmanTree:
         assert curr.is_root
         return curr
 
-    def __contains__(self, symbol: int) -> bool:
-        return symbol in self.huffman_dict
+    def get_nyt_path(self) -> Bits:
+        """Get the path of the NYT node"""
+        return Bits.from_int1s(self.nyt_node.get_path())
 
     def __len__(self) -> int:
         raise NotImplementedError(
@@ -114,8 +115,14 @@ class AdaptiveHuffmanTree:
     def n_node(self) -> int:
         return len(self.ordered_list)
 
+    def __contains__(self, symbol: int) -> bool:
+        return symbol in self.huffman_dict
 
-def format_bits_list(bits: list) -> str:
+    def __getitem__(self, symbol: int) -> MetaSymbol[int]:
+        return self.huffman_dict[symbol]
+
+
+def format_bools(bits: list) -> str:
     # helper for debugging
     return "".join([str(int(b)) for b in bits])
 
@@ -161,7 +168,7 @@ class AdaptiveHuffman:
 
     @staticmethod
     def encode_byte(
-        huffman_tree: AdaptiveHuffmanTree, symbol: int, byte_range_check: bool = True
+        huffman_tree: AdaptiveHuffmanTree, symbol: int, check_byte_range: bool = True
     ) -> Bits:
         """Encode a byte.
         We get the result relatively early, but the main job is to update the
@@ -171,27 +178,25 @@ class AdaptiveHuffman:
         Returns:
             Bits: encoded data
         """
-        if byte_range_check and (symbol < 0 or symbol > 255):
+        if check_byte_range and (symbol < 0 or symbol > 255):
             raise ValueError("byte must be in range [0, 255].")
         if huffman_tree.n_leaf <= 1:  # tree has only one leaf: NYT node
             raise ValueError("huffman tree not initialized with first symbol")
         logger.debug(f"begin {symbol=:3d} =0b{symbol:08b}")
 
         if symbol not in huffman_tree:
-            encoded = Bits.from_int1s(
-                huffman_tree.nyt_node.get_path()
-            ) + Bits.from_int8(symbol)
+            encoded = huffman_tree.get_nyt_path() + Bits.from_int8(symbol)
             # encoded should use the NYT node's path before adding the new symbol
             _ = huffman_tree.add_new_symbol(symbol)
             curr = huffman_tree.nyt_node.parent.parent  # update tree from here
         else:
-            curr = huffman_tree.huffman_dict[symbol]
-            encoded = Bits.from_int1s(curr.get_path())
+            curr = huffman_tree[symbol]
+            encoded = curr.get_bits_path()
 
         curr = huffman_tree.update_huffman_tree(curr)
 
         logger.info(f"done encoding {symbol=:3d} ==0b_ {symbol:08b}, {encoded=}")
-        logger.debug(f"new nyt_node path: {huffman_tree.nyt_node.get_path()}")
+        logger.debug(f"new nyt_node path: {huffman_tree.get_nyt_path()}")
         logger.debug(f"new tree: {huffman_tree.root}")
         return encoded
 
@@ -228,7 +233,7 @@ class AdaptiveHuffman:
                 symbol = Bits.from_bools(byte_content).as_int()
                 # do more afterwards
                 logger.info(
-                    f"new byte {symbol=:3d} =0b{symbol:08b} found in {format_bits_list(seen_bits)} "
+                    f"new byte {symbol=:3d} ==0b_ {symbol:08b} in {format_bools(seen_bits)}"
                 )
                 huffman_tree.add_new_symbol(symbol)
                 curr = huffman_tree.nyt_node.parent.parent  # update tree from here
@@ -243,9 +248,9 @@ class AdaptiveHuffman:
                 logger.warning(f"{curr=} is not root")
             decoded_bytes.append(symbol)
             logger.info(
-                f"done decoding seen_bits={format_bits_list(seen_bits)} to {symbol=:3d} ==0b_ {symbol:08b}"
+                f"done decoding seen_bits={format_bools(seen_bits)} to {symbol=:3d} ==0b_ {symbol:08b}"
             )
-            logger.debug(f"new nyt_node path: {huffman_tree.nyt_node.get_path()}")
+            logger.debug(f"new nyt_node path: {huffman_tree.get_nyt_path()}")
             logger.debug(f"new tree: {huffman_tree.root}")
             seen_bits = []
 

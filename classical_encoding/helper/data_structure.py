@@ -398,6 +398,12 @@ class SwappableNode[T]:
         # I used [:0:-1]: reverse without old 0-th element
         return path
 
+    def get_bits_path(self) -> Bits:
+        """
+        The path from the root to the current node as a Bits object.
+        """
+        return Bits.from_int1s(self.get_path())
+
     def get_root[U: "SwappableNode"](self: U) -> U:
         if self.is_dummy_root:
             return self.right
