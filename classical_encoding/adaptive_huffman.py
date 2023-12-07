@@ -45,6 +45,11 @@ class AdaptiveHuffmanTree:
     def __init_without_first_symbol__(
         cls, nyt_value: int = NYT
     ) -> "AdaptiveHuffmanTree":
+        """
+        An alternative constructor for initializing an empty tree.
+        Normally, we initialize the tree with the first symbol, but sometimes
+        we need to initialize the tree without the first symbol.
+        """
         self = cls.__new__(cls)
         self.nyt_node, _ = MetaSymbol.make_root(nyt_value)
         self.root = self.nyt_node
@@ -54,23 +59,23 @@ class AdaptiveHuffmanTree:
         logger.error(f"empty tree created, {self.root=}")
         return self
 
-    def add_new_symbol_and_return_nyt_parent(
-        self, symbol: Byte
-    ) -> tuple[MetaSymbol[int], MetaSymbol[int]]:
-        nyt_node = self.nyt_node
-        symbol_node = nyt_node.extend(symbol)
-        curr = nyt_node.parent
+    def add_new_symbol(self, symbol: Byte) -> MetaSymbol[int]:
+        """
+        Add a new symbol to the tree and adjust the ordered list for the tree.
+        Return the new symbol node.
+        """
+        symbol_node = self.nyt_node.extend(symbol)
+        extended_meta_symbol = self.nyt_node.parent
         # #TODO: 9:start: reuse this code
         # #TODO: this is not performant, for safe operations, we can add ..
         # #TODO+ two nodes with weight 1 directly, NYT still has weight 0
-        self.ordered_list.new_item(curr)
-        self.ordered_list.add_one(curr)
-        # this order is important, curr comes before byte_node as its parent
+        self.ordered_list.new_item(extended_meta_symbol)
+        self.ordered_list.add_one(extended_meta_symbol)
+        # order: parent extended_meta_symbol comes before child symbol_node
         self.ordered_list.new_item(symbol_node)
         self.ordered_list.add_one(symbol_node)
         # #TODO: 9:end: reuse this code
-        curr = curr.parent  # finished adjusting new byte node and its parent
-        return symbol_node, curr
+        return symbol_node
 
     def update_huffman_tree(self, starting_node: MetaSymbol[int]) -> MetaSymbol[int]:
         # returning byte_node, new curr
@@ -165,8 +170,9 @@ class AdaptiveHuffman:
             encoded_symbol = Bits.from_int1s(
                 huffman_tree.nyt_node.get_path()
             ) + Bits.from_int(symbol, 8)
-            # result is not byte_node.path in the next method, but current NYT node's path
-            byte_node, curr = huffman_tree.add_new_symbol_and_return_nyt_parent(symbol)
+            # encoded should use the NYT node's path before adding the new symbol
+            byte_node = huffman_tree.add_new_symbol(symbol)
+            curr = huffman_tree.nyt_node.parent.parent  # update tree from here
             huffman_tree.huffman_dict[symbol] = byte_node
 
         else:
@@ -209,14 +215,15 @@ class AdaptiveHuffman:
 
             if is_new_byte:
                 byte_content = [next(bits) for _ in range(8)]
-                seen_bits.pop()  # remove the last bit, the current `b`
                 seen_bits.extend(byte_content)
                 symbol = Bits.from_bools(byte_content).as_int()
                 # do more afterwards
-                logger.debug(
-                    f"new byte begin for {format_bits_list(seen_bits)} {symbol=:3d} =0b{symbol:08b}"
+                logger.info(
+                    f"new byte {symbol=:3d} =0b{symbol:08b} found in {format_bits_list(seen_bits)} "
                 )
-                _, curr = huffman_tree.add_new_symbol_and_return_nyt_parent(symbol)
+                huffman_tree.add_new_symbol(symbol)
+                curr = huffman_tree.nyt_node.parent.parent  # update tree from here
+
             else:  # decoding a known byte
                 symbol = curr.value
                 assert symbol is not None, f"{curr.is_leaf=} but its value is None"
@@ -275,7 +282,7 @@ def test_unit_adaptive_huffman_coding_no_packer(
 
 
 def test_adaptive_huffman_coding_no_packer():
-    logger.setLevel("ERROR")
+    logger.setLevel("INFO")
 
     source = b"abcddbb"
     expected_tree_status = [
