@@ -17,74 +17,75 @@ NYT = 256  # Not Yet Transmitted. One byte cannot hold; int for typing.
 Byte = int  # Literal[0,...,255]
 
 
-def add_new_symbol_and_return_nyt_parent(
-    encoder_or_decoder: "AdaptiveHuffmanEncoder | AdaptiveHuffmanDecoder",
-    nyt_node: MetaSymbol[int],
-    symbol: Byte,
-):
-    self = encoder_or_decoder
-
-    symbol_node = nyt_node.extend(symbol)
-    curr = nyt_node.parent
-    if curr.is_root:  # #TODO: do we need "self.root"?
-        logger.info("changing root for the first new byte")
-        self.root = curr  # #TODO: only first symbol needs this
-    # #TODO: this is not performant, for safe operations, we can add ..
-    # #TODO+ two nodes with weight 1 directly, NYT still has weight 0
-    self.ordered_list.new_item(curr)
-    self.ordered_list.add_one(curr)
-    # this order is important, curr comes before byte_node as its parent
-    self.ordered_list.new_item(symbol_node)
-    self.ordered_list.add_one(symbol_node)
-    curr = curr.parent  # finished adjusting new byte node and its parent
-    return symbol_node, curr
-
-
-def update_huffman_tree(
-    encoder_or_decoder: "AdaptiveHuffmanEncoder | AdaptiveHuffmanDecoder",
-    starting_node: MetaSymbol[int],
-) -> MetaSymbol[int]:
-    # returning byte_node, new curr
-
-    self = encoder_or_decoder
-    curr = starting_node
-
-    # we have curr and result here.
-
-    # #NOTE: CANNOT use par here because par will change
-    # in the swap_with_subtree method
-    # curr, par = par, par.parent
-    while not curr.is_root:
-        # #NOTE:!! par.is_dummy_root != curr.is_root:
-        first_same_weight = self.ordered_list.get_first_same_weight(curr)
-        if first_same_weight != curr:
-            logger.debug(f"swap {curr=} with {first_same_weight=}")
-            curr.swap_with_subtree(first_same_weight)
-        self.ordered_list.add_one(curr)
-        curr = curr.parent
-
-    if not curr.is_dummy_root:
-        self.ordered_list.add_one(curr)
-    else:
-        curr = curr.right
-        logger.info(f"{curr=} is dummy root, should happen only at the first new byte")
-    # curr is the root
-    return curr
-
-
-class AdaptiveHuffmanEncoder:
-    nyt_node: MetaSymbol[int]  # the Not Yet Transmitted node
-    huffman_dict: dict[int, MetaSymbol[int]]  # byte -> node
-    ordered_list: OrderedList[MetaSymbol[int]]  # weight is managed by ordered_list
+class AdaptiveHuffmanTree:
+    # basically a ExtendedRestrictedFastOrderedList[NullableSwappableNode[int]]
     root: MetaSymbol[int]  # the root of the huffman tree # #TODO: need?
-    # __weight_change: list[int] # maybe we do not want to update weight every
+    nyt_node: MetaSymbol[int]  # the Not Yet Transmitted node
+    huffman_dict: dict[int, MetaSymbol[int]]  # symbol->node, check if symbol new
+    ordered_list: OrderedList[MetaSymbol[int]]  # weight is managed by ordered_list
 
-    def __init__(self) -> None:
+    def __init__(self, first_symbol) -> None:
         self.root, _ = MetaSymbol.make_root(NYT)
         self.nyt_node = self.root
         self.ordered_list = OrderedList()
         self.ordered_list.new_item(self.nyt_node)
         self.huffman_dict = {NYT: self.nyt_node}
+
+    def add_new_symbol_and_return_nyt_parent(
+        self, symbol: Byte
+    ) -> tuple[MetaSymbol[int], MetaSymbol[int]]:
+        nyt_node = self.nyt_node
+        symbol_node = nyt_node.extend(symbol)
+        curr = nyt_node.parent
+        if curr.is_root:  # #TODO: do we need "self.root"?
+            logger.info("changing root for the first new byte")
+            self.root = curr  # #TODO: only first symbol needs this
+        # #TODO: this is not performant, for safe operations, we can add ..
+        # #TODO+ two nodes with weight 1 directly, NYT still has weight 0
+        self.ordered_list.new_item(curr)
+        self.ordered_list.add_one(curr)
+        # this order is important, curr comes before byte_node as its parent
+        self.ordered_list.new_item(symbol_node)
+        self.ordered_list.add_one(symbol_node)
+        curr = curr.parent  # finished adjusting new byte node and its parent
+        return symbol_node, curr
+
+    def update_huffman_tree(self, starting_node: MetaSymbol[int]) -> MetaSymbol[int]:
+        # returning byte_node, new curr
+        curr = starting_node
+        # we have curr and result here.
+
+        # #NOTE: CANNOT use par here because par will change
+        # in the swap_with_subtree method
+        # curr, par = par, par.parent
+        while not curr.is_root:
+            # #NOTE:!! par.is_dummy_root != curr.is_root:
+            first_same_weight = self.ordered_list.get_first_same_weight(curr)
+            if first_same_weight != curr:
+                logger.debug(f"swap {curr=} with {first_same_weight=}")
+                curr.swap_with_subtree(first_same_weight)
+            self.ordered_list.add_one(curr)
+            curr = curr.parent
+
+        if not curr.is_dummy_root:
+            self.ordered_list.add_one(curr)
+        else:
+            curr = curr.right
+            logger.info(
+                f"{curr=} is dummy root, should happen only at the first new byte"
+            )
+        # curr is the root
+        return curr
+
+    def __contains__(self, symbol: int) -> bool:
+        return symbol in self.huffman_dict
+
+
+class AdaptiveHuffmanEncoder:
+    huffman_tree: AdaptiveHuffmanTree
+
+    def __init__(self) -> None:
+        self.huffman_tree = AdaptiveHuffmanTree(NYT)
 
     def encode_byte(self, symbol: int, byte_range_check: bool = True) -> Bits:
         """Encode a byte.
@@ -99,27 +100,27 @@ class AdaptiveHuffmanEncoder:
             raise ValueError("byte must be in range [0, 255].")
         logger.debug(f"begin {symbol=:3d} =0b{symbol:08b}")
 
-        is_new_byte = symbol not in self.huffman_dict
+        is_new_byte = symbol not in self.huffman_tree
 
         if is_new_byte:
-            encoded_symbol = Bits.from_int1s(self.nyt_node.get_path()) + Bits.from_int(
-                symbol, 8
-            )
+            encoded_symbol = Bits.from_int1s(
+                self.huffman_tree.nyt_node.get_path()
+            ) + Bits.from_int(symbol, 8)
             # result is not byte_node.path in the next method, but current NYT node's path
-            byte_node, curr = add_new_symbol_and_return_nyt_parent(
-                self, self.nyt_node, symbol
+            byte_node, curr = self.huffman_tree.add_new_symbol_and_return_nyt_parent(
+                symbol
             )
-            self.huffman_dict[symbol] = byte_node
+            self.huffman_tree.huffman_dict[symbol] = byte_node
 
         else:
-            curr = self.huffman_dict[symbol]
+            curr = self.huffman_tree.huffman_dict[symbol]
             encoded_symbol = Bits.from_int1s(curr.get_path())
 
-        curr = update_huffman_tree(self, curr)
+        curr = self.huffman_tree.update_huffman_tree(curr)
 
         logger.info(f"done encoding {symbol=:3d} ==0b_ {symbol:08b}, {encoded_symbol=}")
-        logger.debug(f"new nyt_node path: {self.nyt_node.get_path()}")
-        logger.debug(f"new tree: {self.root}")
+        logger.debug(f"new nyt_node path: {self.huffman_tree.nyt_node.get_path()}")
+        logger.debug(f"new tree: {self.huffman_tree.root}")
         return encoded_symbol
 
 
@@ -128,14 +129,10 @@ def format_bits_list(bits: list) -> str:
 
 
 class AdaptiveHuffmanDecoder:
-    nyt_node: MetaSymbol[int]
-    root: MetaSymbol[int]
-    ordered_list: OrderedList[MetaSymbol[int]]  # to restore the tree
+    huffman_tree: AdaptiveHuffmanTree
 
     def __init__(self) -> None:
-        self.root, _ = MetaSymbol.make_root(NYT)
-        self.nyt_node = self.root
-        self.ordered_list = OrderedList()
+        self.huffman_tree = AdaptiveHuffmanTree(NYT)
 
     def decode_bits(self, bits: Iterator[bool]) -> bytes:
         """Decode a byte.
@@ -145,7 +142,7 @@ class AdaptiveHuffmanDecoder:
             int: decoded byte
         """
         decoded_bytes = bytearray()
-        curr = self.root  # root is needed in decoding
+        curr = self.huffman_tree.root  # root is needed in decoding
         seen_bits = []  # for debugging
         bits = iter([False] + list(bits))  # add a 0 at the beginning for first byte
 
@@ -171,14 +168,12 @@ class AdaptiveHuffmanDecoder:
                 logger.debug(
                     f"new byte begin for {format_bits_list(seen_bits)} {symbol=:3d} =0b{symbol:08b}"
                 )
-                _, curr = add_new_symbol_and_return_nyt_parent(
-                    self, self.nyt_node, symbol
-                )
+                _, curr = self.huffman_tree.add_new_symbol_and_return_nyt_parent(symbol)
             else:  # decoding a known byte
                 symbol = curr.value
                 assert symbol is not None, f"{curr.is_leaf=} but its value is None"
 
-            curr = update_huffman_tree(self, curr)
+            curr = self.huffman_tree.update_huffman_tree(curr)
 
             if not curr.is_root:
                 # #FIX: the result is not consistent here
@@ -187,8 +182,8 @@ class AdaptiveHuffmanDecoder:
             logger.info(
                 f"done decoding seen_bits={format_bits_list(seen_bits)} to {symbol=:3d} ==0b_ {symbol:08b}"
             )
-            logger.debug(f"new nyt_node path: {self.nyt_node.get_path()}")
-            logger.debug(f"new tree: {self.root}")
+            logger.debug(f"new nyt_node path: {self.huffman_tree.nyt_node.get_path()}")
+            logger.debug(f"new tree: {self.huffman_tree.root}")
             seen_bits = []
 
         return bytes(decoded_bytes)
@@ -220,7 +215,7 @@ def test_unit_adaptive_huffman_coding_no_packer(
     else:
         for byte, tree_state in zip(source, expected_tree_status, strict=True):
             encoded += encoder.encode_byte(byte)
-            assert str(encoder.root) == tree_state
+            assert str(encoder.huffman_tree.root) == tree_state
     print(f"encoded test passed with {encoded=}")
     decoder = AdaptiveHuffmanDecoder()
     decoded = decoder.decode_bits(iter(encoded.as_bools()))
