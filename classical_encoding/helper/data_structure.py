@@ -1,7 +1,8 @@
 # for same issue as https://github.com/tiangolo/typer/issues/348,
 # still need to use Optional["BinaryTree"]
 from typing import Iterable, Optional
-from venv import logger
+from venv import logger  # #FIX: check correct logger
+import pydot
 
 from classical_encoding.helper.data_class import Bits
 
@@ -362,6 +363,25 @@ class SwappableNode[T]:
         self.parent.set_child(self.birth_order, self, overwrite=True)
         other.parent.set_child(other.birth_order, other, overwrite=True)
 
+    def __add_nodes_and_edges_to_graph(self, graph: pydot.Dot):
+        # Create a node
+        graph.add_node(pydot.Node(str(self.value)))
+
+        # Add edges if left or right child exists
+        if self.left is not None:
+            graph.add_edge(pydot.Edge(str(self.value), str(self.left.value)))
+            self.left.__add_nodes_and_edges_to_graph(graph)
+        if self.right is not None:
+            graph.add_edge(pydot.Edge(str(self.value), str(self.right.value)))
+            self.right.__add_nodes_and_edges_to_graph(graph)
+
+    def visualize_subtree(self, file_path_str: str = ""):
+        graph = pydot.Dot(graph_type="digraph")
+        self.__add_nodes_and_edges_to_graph(graph)
+        if not file_path_str:
+            file_path_str = f"tree_vis_{self}.png"
+        graph.write(file_path_str, format="png")
+
     def get_child[U: "SwappableNode"](self: U, birth_order: BirthOrder) -> Optional[U]:
         if birth_order == BIRTH_ORDER_LEFT:
             return self.left
@@ -631,6 +651,30 @@ def test_swappable_node():
     print("swap passed")
 
 
+def test_swappable_node_visualize():
+    root, _dummy_root = SwappableNode.make_root(0)
+    node1 = SwappableNode(1, root, BIRTH_ORDER_LEFT)
+    node2 = SwappableNode(2, root, BIRTH_ORDER_RIGHT)
+    node3 = SwappableNode(3, node1, BIRTH_ORDER_LEFT)
+    node4 = SwappableNode(4, node1, BIRTH_ORDER_RIGHT)
+    node5 = SwappableNode(5, node2, BIRTH_ORDER_LEFT)
+    node6 = SwappableNode(6, node2, BIRTH_ORDER_RIGHT)
+    node7 = SwappableNode(7, node3, BIRTH_ORDER_LEFT)
+    node8 = SwappableNode(8, node3, BIRTH_ORDER_RIGHT)
+    _node9 = SwappableNode(9, node4, BIRTH_ORDER_LEFT)
+    _node10 = SwappableNode(10, node4, BIRTH_ORDER_RIGHT)
+    _node11 = SwappableNode(11, node5, BIRTH_ORDER_LEFT)
+    _node12 = SwappableNode(12, node5, BIRTH_ORDER_RIGHT)
+    _node13 = SwappableNode(13, node6, BIRTH_ORDER_LEFT)
+    _node14 = SwappableNode(14, node6, BIRTH_ORDER_RIGHT)
+    _node15 = SwappableNode(15, node7, BIRTH_ORDER_LEFT)
+    _node16 = SwappableNode(16, node7, BIRTH_ORDER_RIGHT)
+    _node17 = SwappableNode(17, node8, BIRTH_ORDER_LEFT)
+    _node18 = SwappableNode(18, node8, BIRTH_ORDER_RIGHT)
+    node2.swap_with_subtree(node7)
+    root.visualize_subtree()
+
+
 def test_nullable_swappable_node():
     root, _dummy_root = NullableSwappableNode.make_root(0)
     node1 = NullableSwappableNode(1, root, BIRTH_ORDER_LEFT)
@@ -668,3 +712,4 @@ if __name__ == "__main__":
     test_extended_restricted_fast_ordered_list()
     test_swappable_node()
     test_nullable_swappable_node()
+    test_swappable_node_visualize()
