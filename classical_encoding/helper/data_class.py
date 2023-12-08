@@ -107,7 +107,12 @@ class Bits(Sequence[bool]):
         return Bits(self.data << other.length | other.data, self.length + other.length)
 
     def __repr__(self) -> str:
+        if self.length > 64:  # conversion to decimal is too slow and pointless
+            return f"Bits({self.length=}bit {str(self)})"
         return f"Bits({''.join('1' if bit else '0' for bit in self.seq)}={self.length}bit{self.data})"
+
+    def __str__(self) -> str:
+        return "".join("1" if bit else "0" for bit in self.seq)
 
 
 class ByteSource:  # NamedTuple is less readable and less flexible
