@@ -193,7 +193,7 @@ class ExtendedRestrictedFastOrderedList[T]:
     @property
     def instance_weight(self) -> dict[T, int]:
         """
-        Return the weight of each instance.
+        Return the weight of each instance. Safe to edit.
         """
         return {
             instance: self.__fast_ordered_list[index]
@@ -266,6 +266,17 @@ class ExtendedRestrictedFastOrderedList[T]:
         self.__ordered_instances.append(instance)
         return (instance, instance)
 
+    def get_first_same_weight(self, instance: T) -> T:
+        """Get the first instance with the same weight as the given instance.
+
+        Args:
+            instance (T): The given instance.
+
+        Returns:
+            T: The the first instance in the list with the same weight.
+        """
+        return self.__ordered_instances[self.find_same_weight_as(instance)]
+
     def find_same_weight_as(self, instance: T) -> int:
         """Get the index of the first instance with the same weight as the given instance.
 
@@ -279,16 +290,16 @@ class ExtendedRestrictedFastOrderedList[T]:
             self.__instance_index[instance]
         )
 
-    def get_first_same_weight(self, instance: T) -> T:
-        """Get the first instance with the same weight as the given instance.
+    def weigh_instance(self, instance: T) -> int:
+        """Get the weight of the given instance.
 
         Args:
             instance (T): The given instance.
 
         Returns:
-            T: The the first instance in the list with the same weight.
+            int: The weight of the given instance.
         """
-        return self.__ordered_instances[self.find_same_weight_as(instance)]
+        return self.__fast_ordered_list[self.__instance_index[instance]]
 
     def _check(self):
         """Check if the list and dictionary are consistent."""
