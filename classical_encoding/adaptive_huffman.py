@@ -90,6 +90,17 @@ class AdaptiveHuffmanTree:
         # #NOTE: CANNOT use par here because par will change
         # in the swap_with_subtree method
         # curr, par = par, par.parent
+        same_weight_idx = self.__list.find_same_weight_as(curr)
+        if same_weight_idx == len(self.__list) - 3:
+            # the last 3 nodes: the NYT node (with weight 0), the last added
+            # symbol node and their parent (both with weight `W`)
+            # in this case ("swap NYT parent" in readme), just add one to the
+            # both nodes with weight `W` and continue the update process from
+            # the grandparent of the NYT node.
+            for _ in range(2):
+                self.__list.add_one(curr)
+                curr = curr.parent
+
         while not curr.is_root:
             # #NOTE:!! par.is_dummy_root != curr.is_root:
             first_same_weight = self.__list.get_first_same_weight(curr)
@@ -349,14 +360,10 @@ if __name__ == "__main__":
 
     set_int_max_str_digits(8000)  # TODO: if Bits too long, do not serialize.
 
-    # edge cases:
-    # with open("failed_source.binary", "rb") as f:
-    #     source = f.read()
     # logger.setLevel("DEBUG")
-    # source = b"abcd abcd "
-    # source = b"abc abc "
-    # source = b"ab ab "
-    # source = b"abab"
-    # test_unit_adaptive_huffman_coding_no_packer(source)
+    # Edge Cases:
+    # "swap NYT parent" in readme
+    for source in [b"abcd abcd ", b"abc abc ", b"ab ab ", b"abab"]:
+        test_unit_adaptive_huffman_coding_no_packer(source)
 
     test_adaptive_huffman_coding_no_packer()
