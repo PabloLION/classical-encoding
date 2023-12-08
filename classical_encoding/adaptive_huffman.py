@@ -135,9 +135,6 @@ class AdaptiveHuffmanTree:
         right = self.serialize_node(node.right) if node.right else ""
         child = f"[{left},{right}]" if left or right else ""
         return f"{node.value or 'M'}({self.weigh_node(node)}){child}"
-        # #NOTE: black 23.11.0 does not support py3.12 "" inside "".
-        # formal name "quote reuse", "PEP 701: Syntactic formalization of f-strings"
-        # see https://docs.python.org/3/whatsnew/3.12.html#pep-701-syntactic-formalization-of-f-strings
 
     def __str__(self) -> str:
         return (
@@ -362,16 +359,16 @@ def test_unit_adaptive_huffman_coding_no_packer(
             raise ValueError(
                 f"expected_tree_status should be completely consumed, but get next {n}"
             )
-    logger.info(f"encoded {source=} to {encoded=}")
+    logger.info(f"encoded {source=} to {str(encoded)=}")
     decoded = AdaptiveHuffman.decode_bits(iter(encoded.as_bools()))
-    logger.info(f"decoded {encoded=} to {decoded=}")
+    logger.info(f"decoded {str(encoded)=} to {decoded=}")
 
     assert source == decoded, f"{source=} != {decoded=}"
     logger.warning(f"encoded test passed with {source=} {decoded=}")
     # TODO: misuse warning
 
 
-def test_adaptive_huffman_coding_no_packer():
+def test_adaptive_huffman_coding_no_packer(n_test_case: int):
     source = b"abcddbb"
     expected_tree_status = [
         # TODO: deserialize the tree
@@ -391,19 +388,20 @@ def test_adaptive_huffman_coding_no_packer():
     # TODO: move to test util
     from random import randint
 
-    n_test_case = 0
     n_passed = 0
-    for _ in range(n_test_case):
+    for i in range(n_test_case):
         source_len = randint(1_000, 10_000)
         source = bytes([randint(0, 255) for _ in range(source_len)])
         try:
             test_unit_adaptive_huffman_coding_no_packer(source)
         except Exception as e:
             logger.critical(f"failed with {source=} with error {e=}")
-            with open("failed_source.binary", "wb") as f:
+            with open(f"failed-source{i}.binary", "wb") as f:
                 f.write(source)
         else:
             n_passed += 1
+            logger.error(f"tested {n_passed=} / {n_test_case=} cases")
+            # #TODO: logger: misuse error
     print(f"{n_passed=} / {n_test_case=}")
 
 
@@ -419,6 +417,8 @@ if __name__ == "__main__":
     from sys import set_int_max_str_digits
 
     set_int_max_str_digits(80000)  # TODO: if Bits too long, do not serialize.
+    logger.setLevel("WARNING")
+    # logger.setLevel("ERROR")
 
     # logger.setLevel("DEBUG")
     # Edge Cases:
@@ -429,7 +429,8 @@ if __name__ == "__main__":
     with open("edge-case/wrong add_one.binary", "rb") as f:
         source = f.read()
         test_unit_adaptive_huffman_coding_no_packer(source)
+    # not fully fixed for these cases
+    # for source in [b"aa", b"aabbccdd", b"aaabbbcccddd", b"aaabbbcccddd"]:
+    #     test_unit_adaptive_huffman_coding_no_packer(source)
 
-    logger.setLevel("WARNING")
-
-    test_adaptive_huffman_coding_no_packer()
+    test_adaptive_huffman_coding_no_packer(10)
