@@ -2,6 +2,7 @@
 # still need to use Optional["BinaryTree"]
 from os import path
 from typing import Iterable, Optional
+from typing_extensions import deprecated
 from venv import logger  # #FIX: check correct logger
 import pydot
 
@@ -385,13 +386,14 @@ class SwappableNode[T]:
             graph.add_edge(pydot.Edge(name, str(self.right.__vis_node_name)))
             self.right.__add_nodes_and_edges_to_graph(graph)
 
+    @deprecated("pydot is not stable or I haven't used it correctly")
     def visualize_subtree(self, file_path_str: str = "") -> str:
         graph = pydot.Dot(graph_type="digraph")
         self.__add_nodes_and_edges_to_graph(graph)
         if not file_path_str:
             file_path_str = f"tree_vis_{self}.png"
-        graph.write(file_path_str, format="png")
-        # graph.write(file_path_str + ".svg", format="svg")
+        # graph.write(file_path_str, format="png")
+        graph.write(file_path_str + ".svg", format="svg")
         return path.abspath(file_path_str)
 
     def get_child[U: "SwappableNode"](self: U, birth_order: BirthOrder) -> Optional[U]:
