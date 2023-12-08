@@ -63,12 +63,12 @@ class RestrictedFastOrderedList:
         self.__d = {}
 
     def add_one(self, index: int) -> tuple[int, int]:
-        """Increment the element at the given index by one and update the list
+        """Increment the integer at the given index by one and update the list
         and dictionary. The swapped value is the first integer with the same
         value as the integer at the given index.
 
         Args:
-            index (int): The index of the element to be incremented.
+            index (int): The index of the integer to be incremented.
 
         Returns:
             tuple[int, int]: The indices of the swapped pair (old index, new index)
@@ -98,15 +98,15 @@ class RestrictedFastOrderedList:
             self.__d[new_value] = (start, start + 1)
         return (index, start)
 
-    def get_first_same_weight(self, index: int) -> int:
-        """Get the first element with the same weight as the element at
+    def find_same_value_as(self, index: int) -> int:
+        """Find the first integer with the same weight as the integer at
         the given index.
 
         Args:
-            index (int): The index of the given element.
+            index (int): The index of the given integer.
 
         Returns:
-            int: The index of the first element with the same weight.
+            int: The index of the first integer with the same weight.
         """
         self._assert_range(index)
 
@@ -115,10 +115,10 @@ class RestrictedFastOrderedList:
         return start
 
     def new_item(self) -> int:
-        """Add a new element with value 0 to the list and return its index.
+        """Add a new integer with value 0 to the list and return its index.
 
         Returns:
-            int: The index of the new element.
+            int: The index of the new integer.
         """
         value = 0
         if value in self.__d:
@@ -263,6 +263,19 @@ class ExtendedRestrictedFastOrderedList[T]:
         self.__ordered_instances.append(instance)
         return (instance, instance)
 
+    def find_same_weight_as(self, instance: T) -> int:
+        """Get the index of the first instance with the same weight as the given instance.
+
+        Args:
+            instance (T): The given instance.
+
+        Returns:
+            int: The index of the first instance in the list with the same weight.
+        """
+        return self.__fast_ordered_list.find_same_value_as(
+            self.__instance_index[instance]
+        )
+
     def get_first_same_weight(self, instance: T) -> T:
         """Get the first instance with the same weight as the given instance.
 
@@ -272,11 +285,7 @@ class ExtendedRestrictedFastOrderedList[T]:
         Returns:
             T: The the first instance in the list with the same weight.
         """
-        return self.__ordered_instances[
-            self.__fast_ordered_list.get_first_same_weight(
-                self.__instance_index[instance]
-            )
-        ]
+        return self.__ordered_instances[self.find_same_weight_as(instance)]
 
     def _check(self):
         """Check if the list and dictionary are consistent."""
