@@ -4,6 +4,7 @@ adaptive Huffman coding. Vitter's algorithm is more complicated and efficient
 but not necessary for this project.
 """
 from typing import Any, Callable, Iterator
+from typing_extensions import deprecated
 from classical_encoding.helper.logger import logger
 from classical_encoding.helper.byte_tool import BytePacker
 from classical_encoding.helper.data_class import Bits, ByteSource, WriteOnceDict
@@ -118,6 +119,30 @@ class AdaptiveHuffmanTree:
         """Get the path of the NYT node"""
         return Bits.from_int1s(self._nyt_node.get_path())
 
+    def weigh_symbol(self, symbol: int) -> int:
+        if symbol not in self:
+            logger.error(f"{symbol=} not in {self=}")
+            return -1
+        return self.weigh_node(self[symbol])
+
+    def weigh_node(self, node: MetaSymbol[int]) -> int:
+        return self.__list.weigh_instance(node)
+
+    def serialize_node(self, node: MetaSymbol[int]) -> str:
+        left = self.serialize_node(node.left) if node.left else ""
+        right = self.serialize_node(node.right) if node.right else ""
+        child = f"[{left},{right}]" if left or right else ""
+        return f"{node.value or 'M'}({self.weigh_node(node)}){child}"
+        # #NOTE: black 23.11.0 does not support py3.12 "" inside "".
+        # formal name "quote reuse", "PEP 701: Syntactic formalization of f-strings"
+        # see https://docs.python.org/3/whatsnew/3.12.html#pep-701-syntactic-formalization-of-f-strings
+
+    def __str__(self) -> str:
+        return (
+            "format: `VALUE(WEIGHT)[CHILDREN], VALUE=M for meta symbol\n"
+            + self.serialize_node(self.root)
+        )
+
     def __len__(self) -> int:
         raise NotImplementedError(
             "The length of a AdaptiveHuffmanTree is not well defined "
@@ -139,6 +164,11 @@ class AdaptiveHuffmanTree:
     def __getitem__(self, symbol: int) -> MetaSymbol[int]:
         return self.__dict[symbol]
 
+    def __setitem__(self, symbol: int, node: MetaSymbol[int]) -> None:
+        if symbol in self.__dict:
+            raise ValueError(f"{symbol=} already in {self=}")
+        self.__dict[symbol] = node
+
 
 def fmt_bools(bits: list) -> str:
     # helper for debugging
@@ -151,7 +181,9 @@ class AdaptiveHuffman:
     @staticmethod
     def encode_bytes(
         bytes: Iterator[Byte],  # #TODO: also accept bytes
+        *,
         tree_state_check: Callable[[str], bool] | None = None,
+        on_error: Callable[[Exception, AdaptiveHuffmanTree], Exception] | None = None,
     ) -> Bits:
         """Encode a sequence of bytes."""
         # The tree_state_check is the easiest and cleanest way I come up with
@@ -175,11 +207,23 @@ class AdaptiveHuffman:
         # 5. Pass a list to compare the tree state.
         #   - not flexible.
         #   - reduces the readability of the code.
+        if on_error is None:
+
+            def rethrow(e: Exception, _t: AdaptiveHuffmanTree) -> Exception:
+                raise e
+
+            on_error = rethrow
+
         first_byte = next(bytes)
         encoded_bits = Bits.from_int(first_byte, 8)
         huffman_tree = AdaptiveHuffmanTree(first_byte, nyt_value=NYT)
+
         for byte in bytes:
-            encoded_bits += AdaptiveHuffman.encode_byte(huffman_tree, byte)
+            try:
+                encoded_bits += AdaptiveHuffman.encode_byte(huffman_tree, byte)
+            except Exception as e:
+                new_error = e.__class__(f"{e} at {byte=:3d} ==0b_ {byte:08b}")
+                on_error(new_error, huffman_tree)
             if tree_state_check is not None:
                 tree_state_check(str(huffman_tree.root))
         return encoded_bits
@@ -215,7 +259,7 @@ class AdaptiveHuffman:
 
         logger.info(f"done encoding {symbol=:3d} ==0b_ {symbol:08b}, {encoded=}")
         logger.debug(f"new nyt_node path: {huffman_tree.get_nyt_path()}")
-        logger.debug(f"new tree: {huffman_tree.root}")
+        logger.debug(f"new tree: {huffman_tree}")
         return encoded
 
     @staticmethod
@@ -264,7 +308,7 @@ class AdaptiveHuffman:
                 f"done decoding seen_bits={fmt_bools(seen_bits)} to {symbol=:3d} ==0b_ {symbol:08b}"
             )
             logger.debug(f"new nyt_node path: {huffman_tree.get_nyt_path()}")
-            logger.debug(f"new tree: {huffman_tree.root}")
+            logger.debug(f"new tree: {huffman_tree}")
             seen_bits = []
 
         return bytes(decoded_bytes)
@@ -286,8 +330,21 @@ def adaptive_huffman_encoding(source: ByteSource) -> tuple[bytearray, Bits]:
 def test_unit_adaptive_huffman_coding_no_packer(
     source: bytes, expected_tree_status: list[str] | None = None
 ):
+    @deprecated("node.visualize_subtree is unstable, use `serialize_tree` instead")
+    def vis_on_error(e: Exception, tree: AdaptiveHuffmanTree) -> Exception:
+        logger.critical(f"failed with {source=} with error {e=}")
+        png_path = tree.root.visualize_subtree("failed_tree.svg")
+        # visualize the dummy root for pyDot problem
+        logger.critical(f"visualized tree saved to {png_path}")
+        raise e
+
+    def serialize_tree(e: Exception, tree: AdaptiveHuffmanTree) -> Exception:
+        logger.critical(f"failed with {source=} with error {e=}")
+        logger.critical(f"tree state: {tree}")
+        raise e
+
     if expected_tree_status is None:
-        encoded = AdaptiveHuffman.encode_bytes(iter(source))
+        encoded = AdaptiveHuffman.encode_bytes(iter(source), on_error=serialize_tree)
     else:
         it = iter(expected_tree_status)
 
@@ -296,22 +353,23 @@ def test_unit_adaptive_huffman_coding_no_packer(
             assert tree_state == expected, f"{tree_state=} != {expected=}"
             return True
 
-        encoded = AdaptiveHuffman.encode_bytes(iter(source), tree_state_check)
+        encoded = AdaptiveHuffman.encode_bytes(
+            iter(source), tree_state_check=tree_state_check
+        )
         if (n := next(it, None)) is not None:
             raise ValueError(
                 f"expected_tree_status should be completely consumed, but get next {n}"
             )
-    print(f"encoded {source=} to {encoded=}")
+    logger.info(f"encoded {source=} to {encoded=}")
     decoded = AdaptiveHuffman.decode_bits(iter(encoded.as_bools()))
-    print(f"decoded {encoded=} to {decoded=}")
+    logger.info(f"decoded {encoded=} to {decoded=}")
 
     assert source == decoded, f"{source=} != {decoded=}"
-    print(f"encoded test passed with {source=} {decoded=}")
+    logger.warning(f"encoded test passed with {source=} {decoded=}")
+    # TODO: misuse warning
 
 
 def test_adaptive_huffman_coding_no_packer():
-    logger.setLevel("INFO")
-
     source = b"abcddbb"
     expected_tree_status = [
         # TODO: deserialize the tree
@@ -358,12 +416,18 @@ def test_adaptive_huffman_encoding_with_packer(source: bytes):
 if __name__ == "__main__":
     from sys import set_int_max_str_digits
 
-    set_int_max_str_digits(8000)  # TODO: if Bits too long, do not serialize.
+    set_int_max_str_digits(80000)  # TODO: if Bits too long, do not serialize.
 
     # logger.setLevel("DEBUG")
     # Edge Cases:
     # "swap NYT parent" in readme
     for source in [b"abcd abcd ", b"abc abc ", b"ab ab ", b"abab"]:
         test_unit_adaptive_huffman_coding_no_packer(source)
+
+    with open("edge-case/unknown.binary", "rb") as f:
+        source = f.read()
+        test_unit_adaptive_huffman_coding_no_packer(source)
+
+    logger.setLevel("WARNING")
 
     test_adaptive_huffman_coding_no_packer()
