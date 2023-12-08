@@ -17,6 +17,7 @@ poetry shell
 - [ ] N-ary Huffman coding
 - [ ] Add a transmitter to the pipeline and implement error correction
 - [ ] UML graph of algorithms
+- [ ] Test with more probability distributions of symbols for to find the relation with entropy
 
 ### Small
 
