@@ -98,9 +98,11 @@ class AdaptiveHuffmanTree:
             # in this case ("swap NYT parent" in readme), just add one to the
             # both nodes with weight `W` and continue the update process from
             # the grandparent of the NYT node.
-            for _ in range(2):
-                self.__list.add_one(curr)
-                curr = curr.parent
+
+            # again, the order is important. I spent 3h to find this bug.
+            for node in curr.parent.parent, curr.parent:
+                self.__list.add_one(node)
+            curr = curr.parent.parent
 
         while not curr.is_root:
             # #NOTE:!! par.is_dummy_root != curr.is_root:
@@ -424,7 +426,7 @@ if __name__ == "__main__":
     for source in [b"abcd abcd ", b"abc abc ", b"ab ab ", b"abab"]:
         test_unit_adaptive_huffman_coding_no_packer(source)
 
-    with open("edge-case/unknown.binary", "rb") as f:
+    with open("edge-case/wrong add_one.binary", "rb") as f:
         source = f.read()
         test_unit_adaptive_huffman_coding_no_packer(source)
 
