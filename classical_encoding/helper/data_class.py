@@ -130,3 +130,10 @@ class ByteSource:  # NamedTuple is less readable and less flexible
             self._end_symbol = Bits(next(i for i in range(256) if i not in alphabet), 8)
         else:
             self._end_symbol = Bits(STABLE_EOT, STABLE_EOT.bit_length())
+
+
+class WriteOnceDict[K, V](dict[K, V]):
+    def __setitem__(self, key, value):
+        if key in self:
+            raise KeyError(f"Cannot modify an existing key: {key}")
+        super().__setitem__(key, value)

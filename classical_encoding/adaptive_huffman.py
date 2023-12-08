@@ -3,10 +3,10 @@ This is the implementation of FGK algorithm, which is the first and easier
 adaptive Huffman coding. Vitter's algorithm is more complicated and efficient
 but not necessary for this project.
 """
-from typing import Callable, Iterator
+from typing import Any, Callable, Iterator
 from classical_encoding.helper.logger import logger
 from classical_encoding.helper.byte_tool import BytePacker
-from classical_encoding.helper.data_class import Bits, ByteSource
+from classical_encoding.helper.data_class import Bits, ByteSource, WriteOnceDict
 from classical_encoding.helper.data_structure import (
     ExtendedRestrictedFastOrderedList as OrderedList,
     NullableSwappableNode as MetaSymbol,
@@ -31,17 +31,14 @@ class AdaptiveHuffmanTree:
     def nyt_node(self) -> MetaSymbol[int]:
         return self._nyt_node
 
-    __dict: dict[int, MetaSymbol[int]]  # huffman dict, symbol->node, for new symbol
-    # #TODO: this dict should be write-once
-
-    __list: OrderedList[MetaSymbol[int]]  # weight is managed by ordered_list
+    __dict: WriteOnceDict[int, MetaSymbol[int]]  # huffman dict, symbol->node
+    __list: OrderedList[MetaSymbol[int]]  # ordered_list manages node weights
 
     def __init__(self, first_symbol: Byte, nyt_value: int = NYT) -> None:
-        self.__initialize_all_attributes(nyt_value)  #  without first symbol
-        symbol_node = self.add_symbol(first_symbol)  # add the first symbol
+        self.__initialize_all_attributes(nyt_value)  # without first symbol
+        _symbol_node = self.add_symbol(first_symbol)  # add the first symbol
         # update the outdated attributes, only needed for the first symbol.
         self._root = self.nyt_node.parent
-        self.__dict = {nyt_value: self.nyt_node, first_symbol: symbol_node}
 
     def __initialize_all_attributes(self, nyt_value: int = NYT) -> None:
         """Initialize all attributes of the adaptive huffman tree"""
@@ -49,7 +46,8 @@ class AdaptiveHuffmanTree:
         self._root = self.nyt_node
         self.__list = OrderedList()
         self.__list.new_item(self.nyt_node)
-        self.__dict = {nyt_value: self.nyt_node}
+        self.__dict = WriteOnceDict()
+        self.__dict[nyt_value] = self.nyt_node
 
     @classmethod
     def _init_without_first_symbol(cls, nyt_value: int = NYT) -> "AdaptiveHuffmanTree":
@@ -88,10 +86,7 @@ class AdaptiveHuffmanTree:
         Update the huffman tree and the ordered list from the starting node.
         Return the root of the tree.
         """
-
         curr = starting_node
-        # we have curr and result here.
-
         # #NOTE: CANNOT use par here because par will change
         # in the swap_with_subtree method
         # curr, par = par, par.parent
@@ -134,7 +129,7 @@ class AdaptiveHuffmanTree:
         return self.__dict[symbol]
 
 
-def format_bools(bits: list) -> str:
+def fmt_bools(bits: list) -> str:
     # helper for debugging
     return "".join([str(int(b)) for b in bits])
 
@@ -229,10 +224,10 @@ class AdaptiveHuffman:
         for b in bits:  # #TODO: kill indent with next(iter)
             seen_bits.append(b)
             # find the leaf node
-            assert curr is not None  # for type checking
+            assert curr is not None, f"input bits not valid at {fmt_bools(seen_bits)}"
             if not curr.is_leaf:
                 curr = curr.get_child(1 if b else 0)
-            assert curr is not None  # for type checking
+            assert curr is not None, f"input bits not valid at {fmt_bools(seen_bits)}"
             if not curr.is_leaf:
                 continue
 
@@ -244,7 +239,7 @@ class AdaptiveHuffman:
                 symbol = Bits.from_bools(byte_content).as_int()
                 # do more afterwards
                 logger.info(
-                    f"new {symbol=:3d} ==0b_ {symbol:08b} in {format_bools(seen_bits)}"
+                    f"new {symbol=:3d} ==0b_ {symbol:08b} in {fmt_bools(seen_bits)}"
                 )
                 huffman_tree.add_symbol(symbol)
                 curr = huffman_tree.nyt_node.parent.parent  # update tree from here
@@ -255,7 +250,7 @@ class AdaptiveHuffman:
             decoded_bytes.append(symbol)
             curr = huffman_tree.update_huffman_tree(curr)
             logger.info(
-                f"done decoding seen_bits={format_bools(seen_bits)} to {symbol=:3d} ==0b_ {symbol:08b}"
+                f"done decoding seen_bits={fmt_bools(seen_bits)} to {symbol=:3d} ==0b_ {symbol:08b}"
             )
             logger.debug(f"new nyt_node path: {huffman_tree.get_nyt_path()}")
             logger.debug(f"new tree: {huffman_tree.root}")
