@@ -3,7 +3,7 @@ This is the implementation of FGK algorithm, which is the first and easier
 adaptive Huffman coding. Vitter's algorithm is more complicated and efficient
 but not necessary for this project.
 """
-from typing import Any, Callable, Iterator
+from typing import Callable, Iterator
 from typing_extensions import deprecated
 from classical_encoding.helper.logger import logger
 from classical_encoding.helper.byte_tool import BytePacker
@@ -99,10 +99,11 @@ class AdaptiveHuffmanTree:
             # both nodes with weight `W` and continue the update process from
             # the grandparent of the NYT node.
 
-            # again, the order is important. I spent 3h to find this bug.
-            for node in curr.parent.parent, curr.parent:
+            # again, the order is important. I spent 3h to find this bug.n
+            par = curr.parent  # if `par` is root, don't add_one(grandparent)
+            for node in (par.parent, par)[: ~int(par.is_root)]:  # trick for ↑
                 self.__list.add_one(node)
-            curr = curr.parent.parent
+            curr = par if par.is_root else par.parent
 
         while not curr.is_root:
             # #NOTE:!! par.is_dummy_root != curr.is_root:
@@ -400,7 +401,7 @@ def test_adaptive_huffman_coding_no_packer(n_test_case: int):
                 f.write(source)
         else:
             n_passed += 1
-            logger.error(f"tested {n_passed=} / {n_test_case=} cases")
+            logger.error(f"{n_passed=} / n_tested={i+1} / n_total={n_test_case}")
             # #TODO: logger: misuse error
     print(f"{n_passed=} / {n_test_case=}")
 
@@ -429,8 +430,7 @@ if __name__ == "__main__":
     with open("edge-case/wrong add_one.binary", "rb") as f:
         source = f.read()
         test_unit_adaptive_huffman_coding_no_packer(source)
-    # not fully fixed for these cases
-    # for source in [b"aa", b"aabbccdd", b"aaabbbcccddd", b"aaabbbcccddd"]:
-    #     test_unit_adaptive_huffman_coding_no_packer(source)
+    for source in [b"aa", b"aabbccdd", b"aaabbbcccddd", b"aaabbbcccddd"]:
+        test_unit_adaptive_huffman_coding_no_packer(source)
 
-    test_adaptive_huffman_coding_no_packer(10)
+    test_adaptive_huffman_coding_no_packer(1000)
