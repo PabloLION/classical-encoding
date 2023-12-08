@@ -1,5 +1,6 @@
 # for same issue as https://github.com/tiangolo/typer/issues/348,
 # still need to use Optional["BinaryTree"]
+from os import path
 from typing import Iterable, Optional
 from venv import logger  # #FIX: check correct logger
 import pydot
@@ -363,24 +364,35 @@ class SwappableNode[T]:
         self.parent.set_child(self.birth_order, self, overwrite=True)
         other.parent.set_child(other.birth_order, other, overwrite=True)
 
+    @property
+    def __vis_node_name(self) -> str:
+        return str(self.value or self)
+
     def __add_nodes_and_edges_to_graph(self, graph: pydot.Dot):
-        # Create a node
-        graph.add_node(pydot.Node(str(self.value)))
+        # #TODO: research and report problem with the pydot module
+        # I'm only using pydot.Node with rectangle shape but it still
+        # has circle shape in the graph (or eclipse?)
+        # Root node is not shown with label but name, with an extra node
+        # maybe because I used `[ROOT]`? but it's still wrong in my error case.
+        name, label = self.__vis_node_name, str(self.value or "meta")
+        graph.add_node(pydot.Node(name, shape="rectangle", label=label))
 
         # Add edges if left or right child exists
         if self.left is not None:
-            graph.add_edge(pydot.Edge(str(self.value), str(self.left.value)))
+            graph.add_edge(pydot.Edge(name, str(self.left.__vis_node_name)))
             self.left.__add_nodes_and_edges_to_graph(graph)
         if self.right is not None:
-            graph.add_edge(pydot.Edge(str(self.value), str(self.right.value)))
+            graph.add_edge(pydot.Edge(name, str(self.right.__vis_node_name)))
             self.right.__add_nodes_and_edges_to_graph(graph)
 
-    def visualize_subtree(self, file_path_str: str = ""):
+    def visualize_subtree(self, file_path_str: str = "") -> str:
         graph = pydot.Dot(graph_type="digraph")
         self.__add_nodes_and_edges_to_graph(graph)
         if not file_path_str:
             file_path_str = f"tree_vis_{self}.png"
         graph.write(file_path_str, format="png")
+        # graph.write(file_path_str + ".svg", format="svg")
+        return path.abspath(file_path_str)
 
     def get_child[U: "SwappableNode"](self: U, birth_order: BirthOrder) -> Optional[U]:
         if birth_order == BIRTH_ORDER_LEFT:
@@ -672,7 +684,8 @@ def test_swappable_node_visualize():
     _node17 = SwappableNode(17, node8, BIRTH_ORDER_LEFT)
     _node18 = SwappableNode(18, node8, BIRTH_ORDER_RIGHT)
     node2.swap_with_subtree(node7)
-    root.visualize_subtree()
+    path = root.visualize_subtree()
+    print(f"visualize passed, saved to {path=}")
 
 
 def test_nullable_swappable_node():
