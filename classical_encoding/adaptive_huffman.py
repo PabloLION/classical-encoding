@@ -72,8 +72,8 @@ class AdaptiveHuffmanTree:
         """
         symbol_node = self._nyt_node.extend(symbol)
         extended_meta_symbol = self._nyt_node.parent
-        # #TODO: this is not performant, for safe operations, we can add ..
-        # #TODO+ two nodes with weight 1 directly, NYT still has weight 0
+        # #TODO: performance: we know it's safe to add two nodes with weight 1
+        # #TODO+ directly, NYT still has weight 0
         self.__list.new_item(extended_meta_symbol)
         self.__list.add_one(extended_meta_symbol)
         # order: parent extended_meta_symbol comes before child symbol_node
