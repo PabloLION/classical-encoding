@@ -1,7 +1,7 @@
 from typing import Any, Callable, Collection
 
-
-type Bytes = Collection[int]
+type Byte = int
+type Bytes = Collection[Byte]
 type Quantize = Callable[[Bytes], Bytes]
 type Dequantize = Callable[[Bytes], Bytes]
 type PredictionExtract = Callable[[Any], Bytes]  # #TODO: Any
@@ -26,33 +26,27 @@ def identity[T](x: T) -> T:
     fake_entropy_encoder,
     fake_entropy_decoder,
     fake_error_correction_generator,
-) = (identity,) * 5
+    fake_transmission_send,
+    fake_transmission_receive,
+) = (identity,) * 7
 
 
-def fake_prediction_extract(data: Bytes) -> Bytes:
+def fake_prediction_extract[T](data: T) -> T:
     # the prediction used is always 0
     return data
 
 
-def fake_prediction_restore(data: Bytes) -> Bytes:
+def fake_prediction_restore[T](data: T) -> T:
     # the prediction used is always 0
     return data
 
 
-def fake_transmission_send(data: Bytes) -> Bytes:
-    return data
-
-
-def fake_transmission_receive(data: Bytes) -> Bytes:
-    return data
-
-
-def fake_error_correction_extract(_data_with_ecc: Bytes) -> bool:
+def fake_error_correction_extract[T](data_with_ecc: T) -> T:
     # ECC: Error Correction Code
-    return True
+    return data_with_ecc
 
 
-class CompressionPipeline[T: Bytes]:
+class CompressionPipeline[T: Byte]:
     quantize: Quantize
     dequantize: Dequantize
     prediction_extract: PredictionExtract
@@ -78,7 +72,7 @@ class CompressionPipeline[T: Bytes]:
         ecc_extract: ECCExtract = fake_error_correction_generator,
         transmission_send: TransmissionSend = fake_transmission_send,
         transmission_receive: TransmissionReceive = fake_transmission_receive,
-        compression_metrics: CompressionMetrics = lambda raw, transmitted: None,
+        compression_metrics: CompressionMetrics = lambda _raw, _transmitted: None,
     ):
         self.quantize = quantize
         self.dequantize = dequantize
@@ -92,21 +86,21 @@ class CompressionPipeline[T: Bytes]:
         self.transmission_receive = transmission_receive
         self.compression_metrics = compression_metrics
 
-    def sender_pipeline(self, data):
+    def sender_pipeline(self, data: Collection[T]) -> Collection[T]:
         quantization_index = self.quantize(data)
         prediction_residual = self.prediction_extract(quantization_index)
         entropy_encoded = self.entropy_encode(prediction_residual)
         encoded_with_ecc = self.error_correction_integrate(entropy_encoded)
-        return encoded_with_ecc
+        return encoded_with_ecc  # transmitted data # type: ignore #TODO: fix type
 
-    def receiver_pipeline(self, encoded_with_ecc):
+    def receiver_pipeline(self, encoded_with_ecc: Collection[T]):
         encoded = self.error_correction_extract(encoded_with_ecc)
         entropy_decoded = self.entropy_decode(encoded)
         prediction_residual = self.prediction_restore(entropy_decoded)
         reconstructed = self.dequantize(prediction_residual)
         return reconstructed
 
-    def run(self, raw_data: T):
+    def run(self, raw_data: Collection[T]):
         transmitted = self.sender_pipeline(raw_data)
         metrics = self.compression_metrics(raw_data, transmitted)
         reconstructed = self.receiver_pipeline(transmitted)
@@ -114,7 +108,8 @@ class CompressionPipeline[T: Bytes]:
 
 
 def test_default_pipeline():
-    pipeline = CompressionPipeline()
+    Symbol = Byte
+    pipeline = CompressionPipeline[Symbol]()
     data = b"Hello World!"
     reconstructed, metrics = pipeline.run(data)
     assert reconstructed == data
