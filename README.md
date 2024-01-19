@@ -1,6 +1,8 @@
 ## Dev
 
-```bash
+Execute these command in the root of this repository to setup the development environment. If `poetry` is not installed, see <https://python-poetry.org/docs/#installation>.
+
+```sh
 poetry install
 poetry shell
 ```
