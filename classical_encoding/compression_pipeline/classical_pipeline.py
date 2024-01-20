@@ -36,7 +36,7 @@ def fake_prediction_extract[T](data: T) -> T:
     # with basic 1D predictor P[x]=I[x-1]
     # SOURCE     1 1 5 8 X
     # PREDICTION 0 1 1 5 8
-    # RESIDUAL   1 1 5 8 (X-8)
+    # RESIDUAL   1 0 4 3 2
 
     # with basic 2D predictor P[x,y]=mean(I[x-1,y-1], I[x-1,y], I[x,y-1])
 
