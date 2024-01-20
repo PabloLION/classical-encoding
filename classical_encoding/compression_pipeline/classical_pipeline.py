@@ -120,6 +120,10 @@ class CompressionPipeline[T: Byte]:
         reconstructed = self.receiver_pipeline(transmitted)
         return reconstructed, metrics
 
+    def _check(self, raw_data: Collection[T]):
+        reconstructed, _metrics = self.run(raw_data)
+        return reconstructed == raw_data
+
 
 def test_default_pipeline():
     Symbol = Byte
