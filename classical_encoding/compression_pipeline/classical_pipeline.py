@@ -1,6 +1,6 @@
 from typing import Any, Callable, Collection
 
-type Byte = int
+type Byte = int  # in range(0,256)
 type Bytes = Collection[Byte]
 type Quantize = Callable[[Bytes], Bytes]
 type Dequantize = Callable[[Bytes], Bytes]
@@ -25,7 +25,7 @@ def identity[T](x: T) -> T:
     fake_dequantizer,
     fake_entropy_encoder,
     fake_entropy_decoder,
-    fake_error_correction_generator,
+    fake_error_correction_generator,  # #FIX: name
     fake_transmission_send,
     fake_transmission_receive,
 ) = (identity,) * 7
@@ -33,11 +33,23 @@ def identity[T](x: T) -> T:
 
 def fake_prediction_extract[T](data: T) -> T:
     # the prediction used is always 0
+    # with basic 1D predictor P[x]=I[x-1]
+    # SOURCE     1 1 5 8 X
+    # PREDICTION 0 1 1 5 8
+    # RESIDUAL   1 1 5 8 (X-8)
+
+    # with basic 2D predictor P[x,y]=mean(I[x-1,y-1], I[x-1,y], I[x,y-1])
+
+    # here the prediction is always 0
+    # SOURCE     1 1 5 8 X
+    # PREDICTION 0 0 0 0 0
+    # RESIDUAL   1 1 5 8 X
     return data
 
 
 def fake_prediction_restore[T](data: T) -> T:
     # the prediction used is always 0
+    # reverse the prediction_extract
     return data
 
 
@@ -94,10 +106,12 @@ class CompressionPipeline[T: Byte]:
         return encoded_with_ecc  # transmitted data # type: ignore #TODO: fix type
 
     def receiver_pipeline(self, encoded_with_ecc: Collection[T]):
+        # Prediction -> Quantize -> Entropy -> ECC -> Transmission
+        # Transmission -> ECC -> EntropyDecode -> Dequantize -> Prediction
         encoded = self.error_correction_extract(encoded_with_ecc)
         entropy_decoded = self.entropy_decode(encoded)
-        prediction_residual = self.prediction_restore(entropy_decoded)
-        reconstructed = self.dequantize(prediction_residual)
+        prediction_residual = self.dequantize(entropy_decoded)
+        reconstructed = self.prediction_restore(prediction_residual)
         return reconstructed
 
     def run(self, raw_data: Collection[T]):
