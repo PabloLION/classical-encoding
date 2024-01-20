@@ -19,11 +19,8 @@ def prediction_extract(data: Sequence[Byte]) -> Sequence[Byte]:
 def prediction_restore(residual: Sequence[Byte]) -> Sequence[Byte]:
     # the prediction used is always 0
     # reverse the prediction_extract
-    prediction = [0]
     data = []
     for i, r in enumerate(residual):
-        new_byte = r + prediction[i]
+        new_byte = r + data[i - 1] if i > 0 else r
         data.append(new_byte)
-        prediction.append(new_byte)
-    data = [x + p for x, p in zip(residual, prediction)]
     return data
