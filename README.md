@@ -4,7 +4,10 @@ Execute these command in the root of this repository to setup the development en
 
 ```sh
 poetry install
+# install with dev dependencies
+poetry install --dev
 poetry shell
+
 ```
 
 ## Note
