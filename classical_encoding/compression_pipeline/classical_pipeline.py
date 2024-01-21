@@ -55,7 +55,7 @@ def fake_prediction_restore(data: Symbols) -> Symbols:
     return data
 
 
-class CompressionPipeline(Generic[Symbol]):
+class CompressionPipeline[Symbol]:
     quantize: Quantize
     dequantize: Dequantize
     prediction_extract: PredictionExtract
