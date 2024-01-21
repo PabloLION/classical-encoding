@@ -1,6 +1,6 @@
 from typing import Any, Callable, Collection
-from compression_metrics.print_metric_mse import calculate_metrics
-from compression_metrics.rate_distortion_plot import rate_distortion
+from classical_encoding.metrics.print_metric import calculate_metrics
+from metrics.rate_distortion_plot import plot_rate_distortion
 
 
 type Byte = int  # in range(0,256)
@@ -64,12 +64,9 @@ def fake_error_correction_extract[T](data_with_ecc: T) -> T:
     # ECC: Error Correction Code
     return data_with_ecc
 
-def my_compression_metrics(raw_data: Bytes, reconstructed: Bytes) -> dict:
-    rate_distortion(raw_data, reconstructed)
+def my_compression_metrics(raw_data: Collection[T], transmitted: Bytes, reconstructed: Bytes) -> dict:
+    plot_rate_distortion(raw_data, transmitted)
     return calculate_metrics(raw_data, reconstructed)
-
-
-
 
 class CompressionPipeline[T: Byte]:
     quantize: Quantize
@@ -130,9 +127,8 @@ class CompressionPipeline[T: Byte]:
 
     def run(self, raw_data: Collection[T]):
         transmitted = self.sender_pipeline(raw_data)
-        # metrics = self.compression_metrics(raw_data, transmitted) error
         reconstructed = self.receiver_pipeline(transmitted)
-        metrics = self.compression_metrics(raw_data, reconstructed)  # right
+        metrics = self.compression_metrics(raw_data, transmitted, reconstructed)
         return reconstructed, metrics
 
     def _check(self, raw_data: Collection[T]):
