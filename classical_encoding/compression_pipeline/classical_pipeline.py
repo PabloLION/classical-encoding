@@ -1,9 +1,7 @@
-from typing import Any, Callable, Collection, Generic, TypeVar
+from typing import Any, Callable, Generic
 
-Byte = TypeVar("Byte", bound=int)  # in range(256), effectively, Byte must be int
-Bytes = Collection[Byte]
-Symbol = TypeVar("Symbol")  # Symbol is the type of the data to be compressed
-Symbols = Collection[Symbol]
+from classical_encoding.helper.typing import Bytes, Symbol, Symbols
+
 
 type Quantize = Callable[[Bytes], Bytes]
 type Dequantize = Callable[[Bytes], Bytes]
@@ -28,7 +26,8 @@ def identity[T](x: T) -> T:
     fake_dequantizer,
     fake_entropy_encoder,
     fake_entropy_decoder,
-    fake_error_correction_generator,  # #FIX: name
+    fake_error_correction_integrate,
+    fake_error_correction_extract,
     fake_transmission_send,
     fake_transmission_receive,
 ) = (identity,) * 7
@@ -56,11 +55,6 @@ def fake_prediction_restore(data: Symbols) -> Symbols:
     return data
 
 
-def fake_error_correction_extract(data_with_ecc: Symbols) -> Symbols:
-    # ECC: Error Correction Code
-    return data_with_ecc
-
-
 class CompressionPipeline(Generic[Symbol]):
     quantize: Quantize
     dequantize: Dequantize
@@ -83,8 +77,8 @@ class CompressionPipeline(Generic[Symbol]):
         prediction_restore: PredictionRestore = fake_prediction_restore,
         entropy_encode: EntropyEncode = fake_entropy_encoder,
         entropy_decode: EntropyDecode = fake_entropy_decoder,
-        ecc_integrate: ECCIntegrate = fake_error_correction_generator,
-        ecc_extract: ECCExtract = fake_error_correction_generator,
+        ecc_integrate: ECCIntegrate = fake_error_correction_integrate,
+        ecc_extract: ECCExtract = fake_error_correction_extract,
         transmission_send: TransmissionSend = fake_transmission_send,
         transmission_receive: TransmissionReceive = fake_transmission_receive,
         compression_metrics: CompressionMetrics = lambda _raw, _transmitted: None,

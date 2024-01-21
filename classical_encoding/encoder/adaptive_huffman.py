@@ -3,47 +3,46 @@ This is the implementation of FGK algorithm, which is the first and easier
 adaptive Huffman coding. Vitter's algorithm is more complicated and efficient
 but not necessary for this project.
 """
-from typing import Callable, Iterator
+from typing import Callable, Generic, Iterator
 from typing_extensions import deprecated
 from classical_encoding.helper.logger import logger
 from classical_encoding.helper.byte_tool import BytePacker
 from classical_encoding.helper.data_class import Bits, ByteSource, WriteOnceDict
 from classical_encoding.helper.data_structure import (
     ExtendedRestrictedFastOrderedList as OrderedList,
-    NullableSwappableNode as MetaSymbol,
+    NullableSwappableNode as MetaNode,
 )
+from classical_encoding.helper.typing import Byte, Symbol
 
-NYT = 256  # Not Yet Transmitted. One byte cannot hold; int for typing.
-
-Byte = int  # Literal[0,...,255]
+NYT = 256  # Not Yet Transmitted. One byte cannot hold
 
 
-class AdaptiveHuffmanTree:
-    # basically a ExtendedRestrictedFastOrderedList[NullableSwappableNode[int]]
-    _root: MetaSymbol[int]  # the root of the huffman tree, for debugging
+class AdaptiveHuffmanTree(Generic[Symbol]):
+    # basically a ExtendedRestrictedFastOrderedList[NullableSwappableNode[Byte]]
+    _root: MetaNode[Symbol]  # the root of the huffman tree, for debugging
 
     @property
-    def root(self) -> MetaSymbol[int]:
+    def root(self) -> MetaNode[Symbol]:
         return self._root
 
-    _nyt_node: MetaSymbol[int]  # the Not Yet Transmitted node
+    _nyt_node: MetaNode[Symbol]  # the Not Yet Transmitted node
 
     @property
-    def nyt_node(self) -> MetaSymbol[int]:
+    def nyt_node(self) -> MetaNode[Symbol]:
         return self._nyt_node
 
-    __dict: WriteOnceDict[int, MetaSymbol[int]]  # huffman dict, symbol->node
-    __list: OrderedList[MetaSymbol[int]]  # ordered_list manages node weights
+    __dict: WriteOnceDict[int, MetaNode[Symbol]]  # huffman dict, symbol->node
+    __list: OrderedList[MetaNode[Symbol]]  # ordered_list manages node weights
 
-    def __init__(self, first_symbol: Byte, nyt_value: int = NYT) -> None:
+    def __init__(self, first_symbol: Symbol, nyt_value: Symbol) -> None:
         self.__initialize_all_attributes(nyt_value)  # without first symbol
         _symbol_node = self.add_symbol(first_symbol)  # add the first symbol
         # update the outdated attributes, only needed for the first symbol.
         self._root = self.nyt_node.parent
 
-    def __initialize_all_attributes(self, nyt_value: int = NYT) -> None:
+    def __initialize_all_attributes(self, nyt_value) -> None:
         """Initialize all attributes of the adaptive huffman tree"""
-        self._nyt_node, _ = MetaSymbol.make_root(nyt_value)
+        self._nyt_node, _ = MetaNode.make_root(nyt_value)
         self._root = self.nyt_node
         self.__list = OrderedList()
         self.__list.new_item(self.nyt_node)
@@ -51,7 +50,7 @@ class AdaptiveHuffmanTree:
         self.__dict[nyt_value] = self.nyt_node
 
     @classmethod
-    def _init_without_first_symbol(cls, nyt_value: int = NYT) -> "AdaptiveHuffmanTree":
+    def _init_without_first_symbol(cls, nyt_value: Symbol) -> "AdaptiveHuffmanTree":
         """
         An alternative constructor for initializing an empty tree.
         Normally, we initialize the tree with the first symbol, but sometimes
@@ -62,7 +61,7 @@ class AdaptiveHuffmanTree:
         logger.error(f"empty tree created, {self._root=}")
         return self
 
-    def add_symbol(self, symbol: Byte) -> MetaSymbol[int]:
+    def add_symbol(self, symbol: Symbol) -> MetaNode[Symbol]:
         """
         Add a new symbol to the tree and adjust the ordered list for the tree.
         Return the new symbol node.
@@ -82,7 +81,7 @@ class AdaptiveHuffmanTree:
         self.__dict[symbol] = symbol_node
         return symbol_node
 
-    def update_huffman_tree(self, starting_node: MetaSymbol[int]) -> MetaSymbol[int]:
+    def update_huffman_tree(self, starting_node: MetaNode[Symbol]) -> MetaNode[Symbol]:
         """
         Update the huffman tree and the ordered list from the starting node.
         Return the root of the tree.
@@ -128,10 +127,10 @@ class AdaptiveHuffmanTree:
             return -1
         return self.weigh_node(self[symbol])
 
-    def weigh_node(self, node: MetaSymbol[int]) -> int:
+    def weigh_node(self, node: MetaNode[Symbol]) -> int:
         return self.__list.weigh_instance(node)
 
-    def serialize_node(self, node: MetaSymbol[int]) -> str:
+    def serialize_node(self, node: MetaNode[Symbol]) -> str:
         left = self.serialize_node(node.left) if node.left else ""
         right = self.serialize_node(node.right) if node.right else ""
         child = f"[{left},{right}]" if left or right else ""
@@ -161,10 +160,10 @@ class AdaptiveHuffmanTree:
     def __contains__(self, symbol: int) -> bool:
         return symbol in self.__dict
 
-    def __getitem__(self, symbol: int) -> MetaSymbol[int]:
+    def __getitem__(self, symbol: int) -> MetaNode[Symbol]:
         return self.__dict[symbol]
 
-    def __setitem__(self, symbol: int, node: MetaSymbol[int]) -> None:
+    def __setitem__(self, symbol: int, node: MetaNode[Symbol]) -> None:
         if symbol in self.__dict:
             raise ValueError(f"{symbol=} already in {self=}")
         self.__dict[symbol] = node
@@ -401,7 +400,7 @@ def test_adaptive_huffman_coding_no_packer(n_test_case: int):
                 f.write(source)
         else:
             n_passed += 1
-            logger.error(f"{n_passed=} / n_tested={i+1} / n_total={n_test_case}")
+            logger.warning(f"{n_passed=} / n_tested={i+1} / n_total={n_test_case}")
             # #TODO: logger: misuse error
     print(f"{n_passed=} / {n_test_case=}")
 
