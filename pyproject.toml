@@ -13,6 +13,8 @@ python = ">=3.12"
 rich = "^13.7.0"
 pydot = "^1.4.2"
 graphviz = "^0.20.1"
+numpy = "^1.26.3"
+pillow = "^10.2.0"
 
 [tool.poetry.group.dev.dependencies]
 typing-extensions = "^4.8.0"
