@@ -135,6 +135,10 @@ class CompressionPipeline[T: Byte]:
         metrics = self.compression_metrics(raw_data, reconstructed)  # right
         return reconstructed, metrics
 
+    def _check(self, raw_data: Collection[T]):
+        reconstructed, _metrics = self.run(raw_data)
+        return reconstructed == raw_data
+
 
 def test_default_pipeline():
     Symbol = Byte
