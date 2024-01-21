@@ -14,7 +14,7 @@ def test_naive_prediction_1d():
 
 
 def test_naive_prediction_1d_purity():
-    # The original data should be restored
+    # Input data should not be changed
     data = [1, 1, 5, 8, 10]
     data_copy = data.copy()
     residual = NaivePrediction1D.prediction_extract(data)
@@ -39,7 +39,3 @@ def test_naive_prediction_1d_with_pipeline():
     assert data_restored == data, f"{data_restored=} != {data=}"
     pipeline._check(data)
     print("test_prediction_with_pipeline OK")
-
-
-# #TODO:
-# Input data should not be changed
