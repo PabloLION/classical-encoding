@@ -1,74 +1,86 @@
 import numpy as np
-from PIL import Image
 
 
-def save_as_raw(image_array, output_path):
-    with open(output_path, "wb") as file:
-        file.write(image_array.tobytes())
-
-def prediction(original_image):
-    original_image = original_image.astype(np.int16)
-
-    prediction_residual = np.zeros_like(original_image, dtype=np.int16)
-    for c in range(original_image.shape[2]):
-        for i in range(1, original_image.shape[0]):
-            for j in range(1, original_image.shape[1]):
-                average = (original_image[i - 1, j, c] + original_image[i, j - 1, c] + original_image[
-                    i - 1, j - 1, c]) // 3
-                prediction_residual[i, j, c] = original_image[i, j, c] - average
-
-        prediction_residual[:, :, c][0, :] = original_image[:, :, c][0, :]
-        prediction_residual[:, :, c][:, 0] = original_image[:, :, c][:, 0]
-
-    return prediction_residual
+# Parameters
+TEST_RAW_IMAGE_PATH = "classical_encoding/compression_pipeline/prediction/img_0000.raw"
+IMAGE_WIDTH = 1000  # 替换
+height = 800  # 替换为图像高度
+channels = 3  # 替换为图像通道数
 
 
-def remove_prediction(prediction_residual):
-    reconstructed = np.zeros_like(prediction_residual, dtype=np.int16)
+def prediction_extract(data_2d):
+    # pad the image with #000 on the top and left
+    data_2d = data_2d.astype(np.int16)
+    padded = np.pad(data_2d, ((1, 0), (1, 0), (0, 0)), "constant")
+    prediction = (padded[1:, :-1, :] + padded[:-1, 1:, :] + padded[:-1, :-1, :]) // 3
+    residue = padded - prediction
+    residue = residue.astype(np.int16)
+
+
+def prediction(data_2d: np.ndarray):
+    """
+    Extract prediction residual from a 2D data
+    """
+
+    assert len(data_2d.shape) == 3, "data must be 2D and with a color band"
+    data_2d = data_2d.astype(np.int16)
+    residue = np.zeros_like(data_2d, dtype=np.int16)
+    for c in range(data_2d.shape[2]):
+        for i in range(1, data_2d.shape[0]):
+            for j in range(1, data_2d.shape[1]):
+                average = (
+                    data_2d[i - 1, j, c]
+                    + data_2d[i, j - 1, c]
+                    + data_2d[i - 1, j - 1, c]
+                ) // 3
+                residue[i, j, c] = data_2d[i, j, c] - average
+    residue[0, :, :] = data_2d[0, :, :]
+    residue[:, 0, :] = data_2d[:, 0, :]
+    return residue
+
+
+def prediction_restore(residual_2d):
+    reconstructed = np.zeros_like(residual_2d, dtype=np.int16)
     for c in range(reconstructed.shape[2]):
-        reconstructed[:, :, c][0, :] = prediction_residual[:, :, c][0, :]
-        reconstructed[:, :, c][:, 0] = prediction_residual[:, :, c][:, 0]
+        reconstructed[:, :, c][0, :] = residual_2d[:, :, c][0, :]
+        reconstructed[:, :, c][:, 0] = residual_2d[:, :, c][:, 0]
 
         for i in range(1, reconstructed.shape[0]):
             for j in range(1, reconstructed.shape[1]):
-                average = (reconstructed[i - 1, j, c] + reconstructed[i, j - 1, c] + reconstructed[
-                    i - 1, j - 1, c]) // 3
-                reconstructed[i, j, c] = average + prediction_residual[i, j, c]
+                average = (
+                    reconstructed[i - 1, j, c]
+                    + reconstructed[i, j - 1, c]
+                    + reconstructed[i - 1, j - 1, c]
+                ) // 3
+                reconstructed[i, j, c] = average + residual_2d[i, j, c]
 
     reconstructed = reconstructed.astype(np.uint8)
     return reconstructed
 
 
-# 读取RAW文件为NumPy数组
-raw_image_path = "img_0000.raw"
-width = 1000  # 替换为图像宽度
-height = 800  # 替换为图像高度
-channels = 3  # 替换为图像通道数
+if __name__ == "__main__":
+    raw_image_path = TEST_RAW_IMAGE_PATH
 
-with open(raw_image_path, "rb") as file:
-    raw_data = np.frombuffer(file.read(), dtype=np.uint8).reshape((height, width, channels))
+    try:
+        with open(raw_image_path, "rb") as file:
+            raw_data: np.ndarray = np.frombuffer(file.read(), dtype=np.uint8).reshape(
+                (height, IMAGE_WIDTH, channels)
+            )
+    except FileNotFoundError:
+        print(f"test file at {raw_image_path} not found.")
+        exit(1)
 
-# 对图像进行RGB通道的像素预测
-predicted_image = prediction(raw_data)
+    predicted_image = prediction(raw_data)
+    predicted_image2 = prediction_extract(raw_data)
+    assert np.all(predicted_image == predicted_image2)
 
-reconstructed_image = remove_prediction(predicted_image)
-print(raw_data.shape,reconstructed_image.shape)
-print(np.all(raw_data == reconstructed_image))
+    reconstructed_image = prediction_restore(predicted_image)
+    print(raw_data.shape, reconstructed_image.shape)
+    print(np.all(raw_data == reconstructed_image))
 
-# print(raw_data)
-print(raw_data[:, :, 0])
-print(raw_data[:, :, 1])
-print(raw_data[:, :, 2])
-print('----------------------------------------')
-# print(predicted_image)
-print(predicted_image[:, :, 0])
-print(predicted_image[:, :, 1])
-print(predicted_image[:, :, 2])
-print('----------------------------------------')
-# print(reconstructed_image)
-print(reconstructed_image[:, :, 0])
-print(reconstructed_image[:, :, 1])
-print(reconstructed_image[:, :, 2])
+    def save_as_raw(image_array, output_path):
+        with open(output_path, "wb") as file:
+            file.write(image_array.tobytes())
 
-# save_as_raw(predicted_image, 'predicted_image.raw')
-save_as_raw(reconstructed_image, 'reconstructed_image.raw')
+    # save_as_raw(predicted_image, 'predicted_image.raw')
+    save_as_raw(reconstructed_image, "reconstructed_image.raw")
