@@ -1,5 +1,4 @@
-from typing import Collection, Sequence, TypeVar
-
+from typing import Sequence, TypeVar
 
 Byte = int
 
