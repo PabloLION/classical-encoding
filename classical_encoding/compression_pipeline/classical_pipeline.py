@@ -58,7 +58,7 @@ def fake_prediction_restore(data: Symbols) -> Symbols:
 
 
 def my_compression_metrics(
-    raw_data: Symbols, transmitted: Symbols, reconstructed: Symbols
+    raw_data: Bytes, transmitted: Bytes, reconstructed: Bytes
 ) -> dict:
     plot_rate_distortion(raw_data, transmitted)
     return calculate_metrics(raw_data, reconstructed)
@@ -76,7 +76,7 @@ class CompressionPipeline[Symbol]:
     transmission_send: TransmissionSend
     transmission_receive: TransmissionReceive
     compression_metrics: CompressionMetrics
-    metrics: Any
+    metrics: list[Metrics]
 
     def __init__(
         self,
@@ -136,7 +136,9 @@ class CompressionPipeline[Symbol]:
         return reconstructed == raw_data
 
     def show_metrics_result(self):
-        print(self.metrics)
+        for m in self.metrics:
+            print(m)
+            # or do something else with m
 
 
 def test_default_pipeline():
