@@ -33,7 +33,7 @@ class UniformScaleQuantizer:
         return x // self.q_step
 
     def dequantize(self, y: int) -> int:
-        return y * self.q_step + self.q_step // 2
+        return max(min(255, y * self.q_step + self.q_step // 2), 0)
 
 
 def test_uniform_scale_quantizer():
@@ -45,7 +45,20 @@ def test_uniform_scale_quantizer():
         assert (
             abs(reconstructed - x) <= peak_absolute_errors
         ), f"Quantization error for {x} is too big, got {reconstructed=}"
-    print("uniform_scale_quantizer: All tests passed")
+
+    assert quantizer.quantize(0) == 0
+    assert quantizer.quantize(1) == 0
+    assert quantizer.quantize(2) == 0
+    assert quantizer.quantize(100) == 33
+    assert quantizer.quantize(255) == 85
+    assert quantizer.dequantize(0) == 1
+    assert quantizer.dequantize(1) == 4
+    assert quantizer.dequantize(2) == 7
+    assert quantizer.dequantize(33) == 100
+    assert (
+        quantizer.dequantize(85) == 255
+    ), f"{quantizer.dequantize(85)=} should not be 256"
+    print("uniform_scale_quantizer tests passed")
 
 
 if __name__ == "__main__":
