@@ -1,15 +1,14 @@
+from typing import NamedTuple
 import numpy as np
 
-
-def read_data(file_path, dtype):
-    data = np.fromfile(file_path, dtype=dtype)
-    return data
-
+class Metrics(NamedTuple):
+    psnr: float
+    mse: float
+    bps: float
 
 def calculate_mse(original, reconstructed):
     mse = np.mean((original - reconstructed) ** 2)
     return mse
-
 
 def calculate_psnr(mse, max_pixel_value=255.0):
     if mse == 0:
@@ -17,23 +16,15 @@ def calculate_psnr(mse, max_pixel_value=255.0):
     psnr = 20 * np.log10(max_pixel_value / np.sqrt(mse))
     return psnr
 
+def calculate_bps(original_data, transmitted):
+    return (transmitted * 8) / original_data
 
-def calculate_metrics(original_file, reconstructed_file, dtype):
-    original_data = read_data(original_file, dtype)
-    reconstructed_data = read_data(reconstructed_file, dtype)
+def calculate_metrics(original_file, transmitted, reconstructed_file):
+    original_data = len(original_file)
+    transmitted_data = len(transmitted)
+    reconstructed_data = len(reconstructed_file)
 
+    bps = calculate_bps(original_data, transmitted_data)
     mse = calculate_mse(original_data, reconstructed_data)
-
     psnr = calculate_psnr(mse)
-
-    print(f"MSE: {mse}, PSNR: {psnr}")
-    return mse, psnr
-
-
-# # 示例用法
-# if __name__ == "__main__":
-#     original_file = 'mandrill.raw'
-#     reconstructed_file = 'mandrill_reconstructed.raw'
-#     dtype = np.dtype('>u1')  # 数据类型
-
-#     calculate_metrics(original_file, reconstructed_file, dtype)
+    return Metrics(psnr,mse,bps)

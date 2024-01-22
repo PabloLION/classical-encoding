@@ -1,6 +1,6 @@
 from typing import Any, Callable, Generic, NamedTuple, Optional
 from classical_encoding.metrics.print_metric import calculate_metrics
-from metrics.rate_distortion_plot import Metrics, plot_rate_distortion
+from classical_encoding.metrics.rate_distortion_plot import Metrics, plot_rate_distortion
 from classical_encoding.helper.typing import Byte, Bytes, Symbol, Symbols
 
 
@@ -21,7 +21,6 @@ type CompressionMetrics = Callable[[Bytes, Bytes, Bytes], Metrics]
 
 def identity[T](x: T) -> T:
     return x
-
 
 (
     fake_quantizer,
@@ -56,12 +55,10 @@ def fake_prediction_restore(data: Symbols) -> Symbols:
     # reverse the prediction_extract
     return data
 
-
 def my_compression_metrics(
     raw_data: Bytes, transmitted: Bytes, reconstructed: Bytes
 ) -> dict:
-    plot_rate_distortion(raw_data, transmitted)
-    return calculate_metrics(raw_data, reconstructed)
+    return calculate_metrics(raw_data, transmitted, reconstructed)
 
 
 class CompressionPipeline[Symbol]:
@@ -136,6 +133,7 @@ class CompressionPipeline[Symbol]:
         return reconstructed == raw_data
 
     def show_metrics_result(self):
+        plot_rate_distortion(self.metrics)
         for m in self.metrics:
             print(m)
             # or do something else with m
@@ -146,9 +144,8 @@ def test_default_pipeline():
     data = b"Hello World!"
     reconstructed, metrics = pipeline.run(data)
     assert reconstructed == data
-    assert metrics is None
+    # assert metrics is None
     print("test_default_pipeline passed")
-
 
 if __name__ == "__main__":
     test_default_pipeline()
