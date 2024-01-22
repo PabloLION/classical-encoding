@@ -1,0 +1,8 @@
+{
+  "files.exclude": {
+    "*.raw": true
+  },
+  "search.exclude": {
+    "*.raw": true
+  }
+}

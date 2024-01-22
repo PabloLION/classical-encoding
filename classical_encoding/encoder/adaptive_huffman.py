@@ -286,7 +286,7 @@ class AdaptiveHuffman:
                 continue
 
             # now we are facing a leaf node
-            # decoding a new symbol because curr is NYT node
+            # decode a new symbol because curr is NYT node
             if curr == huffman_tree.nyt_node:
                 byte_content = [next(bits) for _ in range(8)]
                 seen_bits.extend(byte_content)
@@ -296,8 +296,8 @@ class AdaptiveHuffman:
                     f"new {symbol=:3d} ==0b_ {symbol:08b} in {fmt_bools(seen_bits)}"
                 )
                 huffman_tree.add_symbol(symbol)
-                curr = huffman_tree.nyt_node.parent.parent  # update tree from here
-            else:  # decoding a seen symbol
+                curr = huffman_tree.nyt_node.parent.parent
+            else:  # decode a seen symbol
                 symbol = curr.value
                 assert symbol is not None, f"{curr.is_leaf=} but its value is None"
 

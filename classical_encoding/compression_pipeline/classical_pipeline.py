@@ -7,6 +7,7 @@ type Quantize = Callable[[Bytes], Bytes]
 type Dequantize = Callable[[Bytes], Bytes]
 type PredictionExtract = Callable[[Any], Bytes]  # #TODO: Any
 type PredictionRestore = Callable[[Any], Bytes]  # #TODO: Any
+# ECC: error correction code
 type ECCIntegrate = Callable[[Bytes], Bytes]  # data -> data_with_ecc
 type ECCExtract = Callable[[Bytes], Bytes]  # data_with_ecc -> data
 type TransmissionSend = Callable[[Bytes], Any]  # #TODO: Any
@@ -30,7 +31,7 @@ def identity[T](x: T) -> T:
     fake_error_correction_extract,
     fake_transmission_send,
     fake_transmission_receive,
-) = (identity,) * 7
+) = (identity,) * 8
 
 
 def fake_prediction_extract(data: Symbols) -> Symbols:
@@ -118,6 +119,7 @@ class CompressionPipeline[Symbol]:
         return reconstructed, metrics
 
     def _check(self, raw_data: Symbols):
+        # #TODO: rename: test_with_data
         reconstructed, _metrics = self.run(raw_data)
         return reconstructed == raw_data
 
