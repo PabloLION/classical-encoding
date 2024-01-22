@@ -26,7 +26,7 @@ def process_and_plot(bps, psnr):
     plt.show()
 
 
-def plot_rate_distortion(raw_data: bytes, transmitted: bytes):
+def calculate_and_plot_rate_distortion(raw_data: bytes, transmitted: bytes):
     # 将字节数据转换为NumPy数组 #TODO 需要确认
     raw_data_np = np.frombuffer(raw_data, dtype=np.uint8)
     transmitted_np = np.frombuffer(transmitted, dtype=np.uint8)
@@ -41,3 +41,13 @@ def plot_rate_distortion(raw_data: bytes, transmitted: bytes):
 
     # 调用绘图函数
     plot_rate_distortion(bps, psnr)
+
+
+def plot_rate_distortion(bps_list, psnr_list):
+    plt.figure()
+    plt.plot(bps_list, psnr_list, "bo")
+    plt.xlabel("Bits Per Sample (bps)")
+    plt.ylabel("Peak Signal-to-Noise Ratio (PSNR)")
+    plt.title("PSNR vs. Bits Per Sample")
+    plt.grid(True)
+    plt.show()
