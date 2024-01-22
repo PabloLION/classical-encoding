@@ -1,5 +1,17 @@
+from typing import NamedTuple
 import numpy as np
 import matplotlib.pyplot as plt
+
+
+class Metrics(NamedTuple):
+    psnr: float
+    mse: float
+    bps: float
+
+
+def calculate_metrics(original, transmitted, reconstructed) -> Metrics:
+    # create a `Metrics` Metrics(calc_psnr, mse, bps)
+    ...
 
 
 def calculate_bps(compressed_size_bytes, num_samples):

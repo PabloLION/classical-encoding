@@ -1,7 +1,7 @@
-from typing import Any, Callable, Generic
+from typing import Any, Callable, Generic, NamedTuple, Optional
 from classical_encoding.metrics.print_metric import calculate_metrics
-from metrics.rate_distortion_plot import plot_rate_distortion
-from classical_encoding.helper.typing import Bytes, Symbol, Symbols
+from metrics.rate_distortion_plot import Metrics, plot_rate_distortion
+from classical_encoding.helper.typing import Byte, Bytes, Symbol, Symbols
 
 
 type Quantize = Callable[[Bytes], Bytes]
@@ -15,8 +15,8 @@ type TransmissionSend = Callable[[Bytes], Any]  # #TODO: Any
 type TransmissionReceive = Callable[[Any], Bytes]  # #TODO: Any
 type EntropyEncode = Callable[[Bytes], Bytes]
 type EntropyDecode = Callable[[Bytes], Bytes]
-type CompressionMetrics = Callable[[Bytes, Bytes], Any]
 # input the data before and after compression, output the metrics
+type CompressionMetrics = Callable[[Bytes, Bytes, Bytes], Metrics]
 
 
 def identity[T](x: T) -> T:
@@ -56,7 +56,10 @@ def fake_prediction_restore(data: Symbols) -> Symbols:
     # reverse the prediction_extract
     return data
 
-def my_compression_metrics(raw_data: Symbols, transmitted: Symbols, reconstructed: Symbols) -> dict:
+
+def my_compression_metrics(
+    raw_data: Symbols, transmitted: Symbols, reconstructed: Symbols
+) -> dict:
     plot_rate_distortion(raw_data, transmitted)
     return calculate_metrics(raw_data, reconstructed)
 
@@ -73,6 +76,7 @@ class CompressionPipeline[Symbol]:
     transmission_send: TransmissionSend
     transmission_receive: TransmissionReceive
     compression_metrics: CompressionMetrics
+    metrics: Any
 
     def __init__(
         self,
@@ -88,7 +92,7 @@ class CompressionPipeline[Symbol]:
         transmission_send: TransmissionSend = fake_transmission_send,
         transmission_receive: TransmissionReceive = fake_transmission_receive,
         # compression_metrics: CompressionMetrics = lambda _raw, _transmitted: None,
-        compression_metrics: CompressionMetrics = my_compression_metrics
+        compression_metrics: CompressionMetrics = my_compression_metrics,
     ):
         self.quantize = quantize
         self.dequantize = dequantize
@@ -101,6 +105,7 @@ class CompressionPipeline[Symbol]:
         self.transmission_send = transmission_send
         self.transmission_receive = transmission_receive
         self.compression_metrics = compression_metrics
+        self.metrics = []
 
     def sender_pipeline(self, data: Symbols) -> Symbols:
         quantization_index = self.quantize(data)
@@ -122,6 +127,7 @@ class CompressionPipeline[Symbol]:
         transmitted = self.sender_pipeline(raw_data)
         reconstructed = self.receiver_pipeline(transmitted)
         metrics = self.compression_metrics(raw_data, transmitted, reconstructed)
+        self.metrics.append(metrics)
         return reconstructed, metrics
 
     def _check(self, raw_data: Symbols):
@@ -129,9 +135,12 @@ class CompressionPipeline[Symbol]:
         reconstructed, _metrics = self.run(raw_data)
         return reconstructed == raw_data
 
+    def show_metrics_result(self):
+        print(self.metrics)
+
 
 def test_default_pipeline():
-    pipeline = CompressionPipeline[int]()
+    pipeline = CompressionPipeline[Byte]()
     data = b"Hello World!"
     reconstructed, metrics = pipeline.run(data)
     assert reconstructed == data
