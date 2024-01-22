@@ -166,3 +166,4 @@ cython_debug/
 #.idea/
 /.idea/
 classical_encoding/test_result/
+classical_encoding/dataset/
