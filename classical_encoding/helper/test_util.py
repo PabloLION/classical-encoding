@@ -1,5 +1,8 @@
 from itertools import zip_longest
+from pathlib import Path
 from typing import Iterable
+from PIL import Image
+import numpy
 
 
 def compare_and_show_diff(target: Iterable, source: Iterable) -> bool:
@@ -9,3 +12,8 @@ def compare_and_show_diff(target: Iterable, source: Iterable) -> bool:
             print(f"diff at {i}: {t} != {s}")
             return False
     return True
+
+
+def save_as_png(image_ndarray: numpy.ndarray, output_path: Path | str):
+    image = Image.fromarray(image_ndarray)
+    image.save(output_path)
