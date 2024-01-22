@@ -1,8 +1,9 @@
 import numpy as np
 
+from classical_encoding import TEST_RAW_IMAGE_PATH
+
 
 # Parameters
-TEST_RAW_IMAGE_PATH = "classical_encoding/compression_pipeline/prediction/img_0000.raw"
 IMAGE_WIDTH = 1000  # 替换
 height = 800  # 替换为图像高度
 channels = 3  # 替换为图像通道数

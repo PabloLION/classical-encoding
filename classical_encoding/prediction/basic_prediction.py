@@ -1,7 +1,10 @@
 from typing import Any
 from unittest import result
 import numpy
-from classical_encoding import TEST_RAW_IMAGE_PATH
+from classical_encoding import TEST_RAW_IMAGE_PATH, TEST_RESULT_FOLDER
+from classical_encoding.compression_pipeline.classical_pipeline import (
+    CompressionPipeline,
+)
 from classical_encoding.helper.test_util import save_as_png
 from classical_encoding.helper.typing import Bytes
 
@@ -76,10 +79,9 @@ class NaiveImagePrediction2D:
         n_band: number of bands (e.g. 1 for grayscale, 3 for RGB)
         dtype_in: data type of the raw image
         dtype_safe: safe data type for prediction
-        dtype_residual: data type of the residual bytes, only uint16 is supported
 
     #TODO:
-        U2: support other dtype_residual
+        U2: support other dtype_safe
     """
 
     height: int
@@ -87,7 +89,6 @@ class NaiveImagePrediction2D:
     n_band: int
     dtype_safe: type  # to avoid overflow and underflow
     dtype_raw: type  # data type of the raw image
-    dtype_residual: type  # data type of the residual bytes
 
     def __len__(self) -> int:
         return self.height * self.width * self.n_band
@@ -99,7 +100,6 @@ class NaiveImagePrediction2D:
         n_band: int,
         dtype_raw: type,
         dtype_safe: type,
-        dtype_residual: type,
     ):
         self.width = image_width
         self.height = image_height
@@ -107,7 +107,6 @@ class NaiveImagePrediction2D:
         self.dtype_raw = dtype_raw
         self.dtype_safe = dtype_safe  # to avoid overflow and underflow
         # #TODO: use dynamic dtype_safe from self.dtype for data overflow and underflow
-        self.dtype_residual = dtype_residual  # also consider the endianess
         # #TODO: U2: support other dtype_residual
 
         # temporary assert for dtype
@@ -115,22 +114,23 @@ class NaiveImagePrediction2D:
         assert (
             self.dtype_safe == numpy.int16
         ), "only dtype_safe=numpy.int16 is supported"
-        assert (
-            self.dtype_residual == numpy.int16
-        ), "only dtype_residual=numpy.uint16 is supported"
 
-    def extract(self, raw_data: Bytes) -> Bytes:
+    def extract_ndarray(self, raw_data: Bytes) -> numpy.ndarray:
         img = self.to_ndarray(raw_data, self.dtype_raw)
         # pad the image with #000 on the top and left
-        padded = numpy.pad(img, ((1, 0), (1, 0), (0, 0)), "constant")
-        pred = (padded[1:, :-1, :] + padded[:-1, 1:, :] + padded[:-1, :-1, :]) // 3
-        return self.to_bytes(img - pred, self.dtype_residual)
+        padded = numpy.pad(img, ((1, 0), (1, 0), (0, 0)), "constant").astype(
+            self.dtype_safe
+        )
+        pred = (
+            padded[1:, :-1, :] // 3 + padded[:-1, 1:, :] // 3 + padded[:-1, :-1, :] // 3
+        )
+        return img - pred
 
-    def restore(self, residual: Bytes) -> Bytes:
-        residual_2d = self.to_ndarray(residual, self.dtype_residual)
+    def restore_ndarray(self, residual_3d: numpy.ndarray) -> Bytes:
+        residual_3d = residual_3d.astype(self.dtype_safe)
         # pad the image with #000 on the top and left
-        restored = numpy.zeros_like(
-            (self.height + 1, self.width + 1, self.n_band), dtype=numpy.int16
+        restored = numpy.zeros(
+            (self.height + 1, self.width + 1, self.n_band), dtype=self.dtype_safe
         )
         for h_idx in range(self.height):
             for w_idx in range(self.width):
@@ -138,24 +138,36 @@ class NaiveImagePrediction2D:
                     n00 = restored[h_idx, w_idx, b_idx]
                     n01 = restored[h_idx, w_idx + 1, b_idx]
                     n10 = restored[h_idx + 1, w_idx, b_idx]
-                    prediction = (n00 + n01 + n10) // 3  # at (i+1, j+1, c)
-                    restored[h_idx + 1, w_idx + 1, b_idx] = (
-                        residual_2d[h_idx, w_idx, b_idx] + prediction
-                    )
-        assert numpy.all(
-            0 <= restored < 256
-        ), "restored data should be 8 bits"  # #FIX: use another file
-        # remove the padded #000 on the top and left and convert to uint8
-        return self._assert_size(
-            self.to_bytes(restored[1:, 1:, :], self.dtype_residual)
-        )
+                    prediction = n00 // 3 + n01 // 3 + n10 // 3  # at (i+1, j+1, c)
+                    value = residual_3d[h_idx, w_idx, b_idx] + prediction
+                    restored[h_idx + 1, w_idx + 1, b_idx] = value
 
-    def to_ndarray(self, data: Bytes, dtype: type) -> numpy.ndarray:
+                    assert (
+                        0 <= value < 256
+                    ), f"{value=} at ({h_idx}, {w_idx}, {b_idx}), but restored data should be 8 bits"
+
+        # #TODO: use can_cast to check if the restored data is 8 bits
+        # #FIX: use another file
+
+        # remove the padded #000 on the top and left and convert to uint8
+        return self.to_bytes(restored[1:, 1:, :], self.dtype_raw)
+
+    def extract(self, raw_data: Bytes) -> Bytes:
+        residual_3d = self.extract_ndarray(raw_data)
+        return self.to_bytes(residual_3d, self.dtype_safe)
+
+    def restore(self, residual: Bytes) -> Bytes:
+        int16_residual = NumpyUtils.uint8_bytes_to_int16_ndarray(residual)
+        residual_3d = self.to_ndarray(int16_residual, self.dtype_safe)
+        return self.restore_ndarray(residual_3d)
+
+    def to_ndarray(self, data: Bytes | numpy.ndarray, dtype: type) -> numpy.ndarray:
         """
         Safely convert Bytes of `self.dtype` to ndarray of length `len(self)`,
         type `self.dtype_safe` and shape (self.height, self.width, self.n_band)
         """
-        assert self._assert_size(data)
+        self._assert_size(data)
+        # #TODO: U2: support other types
         self._assert_array_item_can_cast(data, dtype)
         ndarray = numpy.array(data, dtype).reshape(
             (self.height, self.width, self.n_band)
@@ -163,19 +175,31 @@ class NaiveImagePrediction2D:
         return ndarray
 
     def to_bytes(self, data: numpy.ndarray, dtype: type) -> Bytes:
+        if dtype == numpy.uint8:
+            return self.uint8_to_bytes(data, dtype)
+        elif dtype == numpy.int16:
+            return self.int16_to_bytes(data, dtype)
+        else:
+            raise NotImplementedError(f"unsupported dtype={dtype}")
+
+    def uint8_to_bytes(self, data: numpy.ndarray, dtype: type) -> Bytes:
+        self._assert_array_item_can_cast(data, dtype)
+        return data.astype(dtype).flatten().tolist()
+
+    def int16_to_bytes(self, data: numpy.ndarray, dtype: type) -> Bytes:
         """
         Safely convert ndarray of shape (self.height, self.width, self.n_band),
         type `self.dtype` to Bytes of length `len(self)`
         """
         self._assert_array_item_can_cast(data, dtype)
-        return data.flatten().tolist()
+        return NumpyUtils.int16_to_uint8_bytes(data.astype(dtype).flatten())
 
         # use ">" to force big-endian, ">u2" for uint16-BE
-        # assert self.dtype_residual == numpy.uint16  # #TODO: U2: support other types
-        # return data.astype(self.dtype_residual).tobytes()
+        # assert self.dtype_safe == numpy.uint16  # #TODO: U2: support other types
+        # return data.astype(self.dtype_safe).tobytes()
 
-    def _assert_size(self, data: Bytes):
-        msg = f"{len(data)} != {len(self)} == {self.height} * {self.width} * {self.n_band}"
+    def _assert_size[T: Bytes | numpy.ndarray](self, data: T) -> T:
+        msg = f"{len(data)=} != {len(self) } == {self.height=} * {self.width=} * {self.n_band=}"
         assert len(data) == len(self), msg
         return data
 
@@ -197,31 +221,60 @@ class NaiveImagePrediction2D:
 def test_naive_image_prediction():
     dtype_in = numpy.uint8  # data type of the raw image
     dtype_safe = numpy.int16  # safe data type for prediction
-    dtype_residual = (
-        numpy.uint16
-    )  # data type of the residual bytes, only uint16 is supported
 
-    prediction = NaiveImagePrediction2D(
-        1000, 800, 3, dtype_in, dtype_safe, dtype_residual
-    )
+    prediction = NaiveImagePrediction2D(1000, 800, 3, dtype_in, dtype_safe)
 
     buffer = TEST_RAW_IMAGE_PATH.read_bytes()  # good
+    img_list_int = list(buffer)
+
+    # #TODO: remove raw_img
     raw_img = numpy.frombuffer(buffer, dtype=dtype_in)
-    with open(TEST_RAW_IMAGE_PATH, "rb") as file:
-        raw_img2 = numpy.frombuffer(file.read(), dtype=dtype_in)
-    assert numpy.all(raw_img == raw_img2)
+    # same as with open(TEST_RAW_IMAGE_PATH, "rb") as file:
+    #     raw_img = numpy.frombuffer(file.read(), dtype=dtype_in)
 
     raw_data = raw_img.tolist()
     a = numpy.array(raw_data, dtype_safe)
     print(a.size, a.shape, a.dtype)
-    print(numpy.all(0 <= a) and numpy.all(a < 256))
-    print(numpy.can_cast(a, numpy.uint8))
+    print(numpy.all(0 <= a) and numpy.all(a < 256))  # true
+    # output:
+    # 2400000 (2400000,) int16
+    # True
+    # False
+
+    residual_3d = prediction.extract_ndarray(raw_data)
+    restored_from_3d = prediction.restore_ndarray(residual_3d)
+    print(len(restored_from_3d), len(img_list_int))
+    assert restored_from_3d == img_list_int
+    # OK until here
+
     residual = prediction.extract(raw_data)
     restored = prediction.restore(residual)
-    save_as_png(raw_img, "raw.png")
-    save_as_png(restored, "restored.png")
-    assert restored == TEST_RAW_IMAGE_PATH.read_bytes()
+    source_image_ndarry = prediction.to_ndarray(img_list_int, dtype_in)
+    restored_image = prediction.to_ndarray(restored, dtype_in)
+    assert restored == img_list_int
+    save_as_png(source_image_ndarry, TEST_RESULT_FOLDER / "raw.png")
+    save_as_png(restored_image, TEST_RESULT_FOLDER / "restored.png")
+    print(
+        f"test passed: from {TEST_RAW_IMAGE_PATH}, generated raw.png and restored.png in {TEST_RESULT_FOLDER}"
+    )
+
+
+def test_naive_image_prediction_with_pipeline(bytes: Bytes):
+    dtype_in, dtype_safe = numpy.uint8, numpy.int16
+    prediction = NaiveImagePrediction2D(1000, 800, 3, dtype_in, dtype_safe)
+
+    pipeline = CompressionPipeline(
+        prediction_extract=prediction.extract,
+        prediction_restore=prediction.restore,
+    )
+
+    pipeline._check(file_bytes)
+    print("image prediction with pipeline test passed")
 
 
 if __name__ == "__main__":
-    test_naive_image_prediction()
+    # test_naive_image_prediction()
+
+    file_buffer = TEST_RAW_IMAGE_PATH.read_bytes()  # good
+    file_bytes = list(file_buffer)
+    test_naive_image_prediction_with_pipeline(file_bytes)
