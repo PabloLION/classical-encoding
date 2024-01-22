@@ -1,8 +1,45 @@
-from functools import cache
+from typing import Any
+from unittest import result
 import numpy
 from classical_encoding import TEST_RAW_IMAGE_PATH
 from classical_encoding.helper.test_util import save_as_png
 from classical_encoding.helper.typing import Bytes
+
+
+class NumpyUtils:
+    @staticmethod
+    def int16_to_uint8_bytes(int16_arr: numpy.ndarray) -> Bytes:
+        # #TODO: assert range
+        high = (int16_arr >> 8).astype(numpy.uint8)
+        low = (int16_arr & 0xFF).astype(numpy.uint8)
+        # output array will be [h0,l0,h1,l1,...]
+        return numpy.stack((high, low), axis=-1).flatten().tolist()
+
+    @staticmethod
+    def uint8_bytes_to_int16_ndarray(
+        uint8_bytes: Bytes,
+    ) -> numpy.ndarray[numpy.int16, Any]:  # safe Any
+        uint8_ndarray = numpy.array(uint8_bytes)
+        high = uint8_ndarray[::2].astype(numpy.int16)
+        low = uint8_ndarray[1::2].astype(numpy.int16)
+        # #TODO: assert range
+        return ((high << 8) + low).astype(numpy.int16)
+
+
+def test_int16_bytes_conversion():
+    int16_1d_array = numpy.array(
+        [1, 2, 3, 128, 256, 512, 513, 515, -1, -16, -512, -128], dtype=numpy.int16
+    )
+    uint8_bytes = NumpyUtils.int16_to_uint8_bytes(int16_1d_array)
+    expected_str = "0,1,0,2,0,3,0,128,1,0,2,0,2,1,2,3,255,255,255,240,254,0,255,128"
+    exp = list(map(int, expected_str.split(",")))
+    assert uint8_bytes == exp, f"expected {exp} but got {uint8_bytes}"
+    reconstructed_int16_1d_array = NumpyUtils.uint8_bytes_to_int16_ndarray(uint8_bytes)
+    assert numpy.all(reconstructed_int16_1d_array == int16_1d_array)
+
+
+if __name__ == "__main__":
+    test_int16_bytes_conversion()
 
 
 class NaivePrediction1D:
@@ -133,7 +170,7 @@ class NaiveImagePrediction2D:
         self._assert_array_item_can_cast(data, dtype)
         return data.flatten().tolist()
 
-        # use ">" to force big-endian, ">u2" for uint16
+        # use ">" to force big-endian, ">u2" for uint16-BE
         # assert self.dtype_residual == numpy.uint16  # #TODO: U2: support other types
         # return data.astype(self.dtype_residual).tobytes()
 
