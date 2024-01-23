@@ -26,6 +26,10 @@ class UniformScaleQuantizer:
 
     q_step: int
 
+    @property
+    def peak_absolute_errors(self) -> int:
+        return self.q_step // 2
+
     def __init__(self, q_step: int) -> None:
         self.q_step = q_step
 

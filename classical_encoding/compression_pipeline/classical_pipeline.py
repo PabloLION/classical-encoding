@@ -1,7 +1,11 @@
 from typing import Any, Callable, Generic, NamedTuple, Optional
+
+from matplotlib.pylab import f
 from classical_encoding.metrics.print_metric import calculate_metrics
-from classical_encoding.metrics.rate_distortion_plot import Metrics, plot_rate_distortion
-from classical_encoding.helper.typing import Byte, Bytes, Symbol, Symbols
+from classical_encoding.metrics.rate_distortion_plot import (
+    plot_rate_distortion,
+)
+from classical_encoding.helper.typing import Byte, Bytes, Symbol, Symbols, Metrics
 
 
 type Quantize = Callable[[Bytes], Bytes]
@@ -21,6 +25,7 @@ type CompressionMetrics = Callable[[Bytes, Bytes, Bytes], Metrics]
 
 def identity[T](x: T) -> T:
     return x
+
 
 (
     fake_quantizer,
@@ -55,9 +60,10 @@ def fake_prediction_restore(data: Symbols) -> Symbols:
     # reverse the prediction_extract
     return data
 
+
 def my_compression_metrics(
     raw_data: Bytes, transmitted: Bytes, reconstructed: Bytes
-) -> dict:
+) -> Metrics:
     return calculate_metrics(raw_data, transmitted, reconstructed)
 
 
@@ -106,18 +112,23 @@ class CompressionPipeline[Symbol]:
 
     def sender_pipeline(self, data: Symbols) -> Symbols:
         quantization_index = self.quantize(data)
+        print(f"first 10 bytes of quantization_index: {quantization_index[:10]}")
         prediction_residual = self.prediction_extract(quantization_index)
+        print(f"first 10 bytes of prediction_residual: {prediction_residual[:10]}")
         entropy_encoded = self.entropy_encode(prediction_residual)
+        print(f"encoded first 10 bytes of entropy_encoded: {entropy_encoded[:10]}")
         encoded_with_ecc = self.error_correction_integrate(entropy_encoded)
         return encoded_with_ecc  # transmitted data
 
     def receiver_pipeline(self, encoded_with_ecc: Symbols):
         # Prediction -> Quantize -> Entropy -> ECC -> Transmission
         # Transmission -> ECC -> EntropyDecode -> Dequantize -> Prediction
-        encoded = self.error_correction_extract(encoded_with_ecc)
-        entropy_decoded = self.entropy_decode(encoded)
-        prediction_residual = self.dequantize(entropy_decoded)
-        reconstructed = self.prediction_restore(prediction_residual)
+        entropy_encoded = self.error_correction_extract(encoded_with_ecc)
+        print(f"decoding first 10 bytes of entropy_encoded: {entropy_encoded[:10]}")
+        entropy_decoded = self.entropy_decode(entropy_encoded)
+        print(f"decoded first 10 bytes of entropy_decoded: {entropy_decoded[:10]}")
+        quantization_index = self.prediction_restore(entropy_decoded)
+        reconstructed = self.dequantize(quantization_index)
         return reconstructed
 
     def run(self, raw_data: Symbols):
@@ -144,8 +155,8 @@ def test_default_pipeline():
     data = b"Hello World!"
     reconstructed, metrics = pipeline.run(data)
     assert reconstructed == data
-    # assert metrics is None
     print("test_default_pipeline passed")
+
 
 if __name__ == "__main__":
     test_default_pipeline()

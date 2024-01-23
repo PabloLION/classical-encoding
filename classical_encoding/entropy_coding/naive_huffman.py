@@ -127,7 +127,7 @@ def naive_huffman_encode_to_bytes(data_bytes: Bytes) -> Bytes:
 
 
 def naive_huffman_decode_from_bytes(data_bytes: Bytes) -> Bytes:
-    decoded = bytearray()
+    decoded = list()
     tree_length = int.from_bytes(data_bytes[:2], "big")
     tree = MetaSymbol.deserialize(data_bytes[: 2 + tree_length])
     node = tree
@@ -153,7 +153,7 @@ def naive_huffman_decode_from_bytes(data_bytes: Bytes) -> Bytes:
             node = tree
 
     # assert next((b for b in bits if b), 2) == 2, "bits left should be padded 0"
-    return bytes(decoded)
+    return decoded
 
 
 def naive_huffman_decode(tree: MetaSymbol, encoded: bytes, end_symbol: Bits) -> bytes:

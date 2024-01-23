@@ -2,13 +2,17 @@ if __name__ != "__main__":
     raise ImportError(f"Script {__file__} should not be imported as a module")
 
 
+from email.policy import strict
 from time import time
 import numpy
-from classical_encoding import RAW_DATASET_FOLDER, entropy_coding
+from classical_encoding import RAW_DATASET_FOLDER
 from classical_encoding.compression_pipeline.classical_pipeline import (
     CompressionPipeline,
 )
-from classical_encoding.entropy_coding.adaptive_huffman import AdaptiveHuffman
+from classical_encoding.entropy_coding.naive_huffman import (
+    naive_huffman_decode_from_bytes,
+    naive_huffman_encode_to_bytes,
+)
 from classical_encoding.helper.typing import Byte
 from classical_encoding.prediction.basic_prediction import (
     DifferentialPulseCodeModulation2D,
@@ -26,15 +30,14 @@ quantizer = UniformScaleQuantizer(q_step=3)
 prediction = DifferentialPulseCodeModulation2D(
     IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_BANDS, numpy.uint8, numpy.int16
 )
-entropy_coding = AdaptiveHuffman()
 
 pipeline = CompressionPipeline[Byte](
     quantize=quantizer.quantize,
     dequantize=quantizer.dequantize,
     prediction_extract=prediction.extract,
     prediction_restore=prediction.restore,
-    entropy_encode=entropy_coding.encode,
-    entropy_decode=entropy_coding.decode,
+    entropy_encode=naive_huffman_encode_to_bytes,
+    entropy_decode=naive_huffman_decode_from_bytes,
     # ecc_integrate = # not implemented
     # ecc_extract = # not implemented
     # transmission_send = # not implemented
@@ -53,7 +56,13 @@ for img in RAW_DATASET_FOLDER.iterdir():
         img_list = numpy.frombuffer(img_buffer, dtype=dtype_in).tolist()
         compressed_img = pipeline.sender_pipeline(img_list)
         decompressed_img = pipeline.receiver_pipeline(compressed_img)
-        assert img_list == decompressed_img
+
+        for i, d in zip(img_list, decompressed_img, strict=True):
+            error = abs(i - d)
+            assert (
+                error <= quantizer.peak_absolute_errors
+            ), f"error {error} too big for {i} and {d}"
+
         print(f"image {finished}/{total} at {img} passed in {time() - t} second")
         finished += 1
     except Exception as e:

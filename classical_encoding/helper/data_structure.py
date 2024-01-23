@@ -62,6 +62,11 @@ class BinaryTreeNode:
                 pre_order_serialization(node.right)
 
         pre_order_serialization(self)
+
+        if len(tree_bytes) > 65535:
+            raise ValueError("The tree is too large to serialize")
+
+        print(f"serializing with first 10 tree bytes: {tree_bytes[:10]}")
         return [len(tree_bytes) // 256, len(tree_bytes) % 256] + tree_bytes
 
     @classmethod
@@ -74,9 +79,13 @@ class BinaryTreeNode:
         # if the node is 00000001+symbol, it is a node with value symbol
         # then we do a pre-order traversal to serialize the tree
 
+        for b in tree_bytes[:2]:
+            assert 0 <= b < 256, f"invalid tree size in first 2 bytes: {tree_bytes[:2]}"
+
         tree_length = tree_bytes[0] * 256 + tree_bytes[1]
         assert tree_length == len(tree_bytes) - 2
-        tree_bytes = tree_bytes[2:]
+
+        print(f"deserializing with first 10 tree bytes: {tree_bytes[2:12]}")
 
         def build_tree(index: int) -> tuple[BinaryTreeNode | None, int]:
             if index >= len(tree_bytes):
@@ -95,6 +104,10 @@ class BinaryTreeNode:
                     node.left, index = build_tree(index)
                     node.right, index = build_tree(index)
                     return node, index
+                else:
+                    raise ValueError(
+                        f"Invalid flag at index {index} with value {next_flag}"
+                    )
             elif flag == 1:  # Node with value
                 value = tree_bytes[index]
                 index += 1
@@ -103,11 +116,10 @@ class BinaryTreeNode:
                 node.right, index = build_tree(index)
                 return node, index
             else:
-                raise ValueError("Invalid flag")
-            raise ValueError("Invalid flag")
+                raise ValueError(f"Invalid flag at index {index} with value {flag}")
 
-        root, _ = build_tree(0)
-        assert root is not None
+        root, _ = build_tree(2)
+        assert root is not None, f"cannot build an empty tree from {tree_bytes}"
         return root
 
 
