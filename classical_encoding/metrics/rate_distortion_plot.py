@@ -5,7 +5,7 @@ from classical_encoding.helper.typing import Metrics
 
 def plot_rate_distortion(metrics: list[Metrics]):
     bps_list = [m.bps for m in metrics]
-    psnr_list = [m.bps for m in metrics]
+    psnr_list = [m.psnr for m in metrics]
     plt.figure()
     plt.plot(bps_list, psnr_list, "bo")
     plt.xlabel("Bits Per Sample (bps)")

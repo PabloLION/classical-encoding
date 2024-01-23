@@ -50,17 +50,19 @@ t = time()
 finished = 0
 file_path_list = list(RAW_DATASET_FOLDER.iterdir())
 total = len(file_path_list)
-interested_img_count = 3
+interested_img_count = 20
 
+logger.info(f"running test on first {interested_img_count} images")
 for img in file_path_list[:interested_img_count]:
     try:
         logger.debug(f"Testing image {finished}/{interested_img_count} at {img}")
         img_buffer = img.read_bytes()
-        img_list = numpy.frombuffer(img_buffer, dtype=dtype_in).tolist()
-        compressed_img = pipeline.sender_pipeline(img_list)
-        decompressed_img = pipeline.receiver_pipeline(compressed_img)
+        img_as_list = numpy.frombuffer(img_buffer, dtype=dtype_in).tolist()
+        decompressed_img, _ = pipeline.run(img_as_list)
+        # compressed_img = pipeline.sender_pipeline(img_list)
+        # decompressed_img = pipeline.receiver_pipeline(compressed_img)
 
-        for i, d in zip(img_list, decompressed_img, strict=True):
+        for i, d in zip(img_as_list, decompressed_img, strict=True):
             error = abs(i - d)
             assert (
                 error <= quantizer.peak_absolute_errors
@@ -74,5 +76,6 @@ for img in file_path_list[:interested_img_count]:
         raise Exception(f"{img} failed")
     print(f"{img} passed")
 
+print(pipeline.metrics)
 pipeline.show_metrics_result()
 print("All tests passed")
