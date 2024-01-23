@@ -66,7 +66,7 @@ class BinaryTreeNode:
         if len(tree_bytes) > 65535:
             raise ValueError("The tree is too large to serialize")
 
-        print(f"serializing with first 10 tree bytes: {tree_bytes[:10]}")
+        logger.debug(f"serializing with first 10 tree bytes: {tree_bytes[:10]}")
         return [len(tree_bytes) // 256, len(tree_bytes) % 256] + tree_bytes
 
     @classmethod
@@ -85,7 +85,7 @@ class BinaryTreeNode:
         tree_length = tree_bytes[0] * 256 + tree_bytes[1]
         assert tree_length == len(tree_bytes) - 2
 
-        print(f"deserializing with first 10 tree bytes: {tree_bytes[2:12]}")
+        logger.debug(f"deserializing with first 10 tree bytes: {tree_bytes[2:12]}")
 
         def build_tree(index: int) -> tuple[BinaryTreeNode | None, int]:
             if index >= len(tree_bytes):

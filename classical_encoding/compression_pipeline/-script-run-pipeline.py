@@ -2,7 +2,6 @@ if __name__ != "__main__":
     raise ImportError(f"Script {__file__} should not be imported as a module")
 
 
-from email.policy import strict
 from time import time
 import numpy
 from classical_encoding import RAW_DATASET_FOLDER
@@ -21,6 +20,7 @@ from classical_encoding.prediction.basic_prediction import (
 from classical_encoding.quantization.uniform_scale_quantization import (
     UniformScaleQuantizer,
 )
+from classical_encoding.helper.logger import logger
 
 # Params for the pipeline
 IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_BANDS = 1000, 800, 3
@@ -50,11 +50,11 @@ t = time()
 finished = 0
 file_path_list = list(RAW_DATASET_FOLDER.iterdir())
 total = len(file_path_list)
-interested_img_count = 20
+interested_img_count = 3
 
-for img in file_path_list[interested_img_count:]:
+for img in file_path_list[:interested_img_count]:
     try:
-        print(f"Testing image {finished}/{total} at {img}")
+        logger.debug(f"Testing image {finished}/{interested_img_count} at {img}")
         img_buffer = img.read_bytes()
         img_list = numpy.frombuffer(img_buffer, dtype=dtype_in).tolist()
         compressed_img = pipeline.sender_pipeline(img_list)
@@ -66,11 +66,13 @@ for img in file_path_list[interested_img_count:]:
                 error <= quantizer.peak_absolute_errors
             ), f"error {error} too big for {i} and {d}"
 
-        print(f"image {finished}/{total} at {img} passed in {time() - t} second")
+        logger.info(
+            f"image {finished+1}/{interested_img_count} at {img} passed in {time() - t} second"
+        )
         finished += 1
     except Exception as e:
         raise Exception(f"{img} failed")
     print(f"{img} passed")
 
-
+pipeline.show_metrics_result()
 print("All tests passed")

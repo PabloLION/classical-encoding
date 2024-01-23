@@ -6,7 +6,7 @@ from classical_encoding.metrics.rate_distortion_plot import (
     plot_rate_distortion,
 )
 from classical_encoding.helper.typing import Byte, Bytes, Symbol, Symbols, Metrics
-
+from classical_encoding.helper.logger import logger
 
 type Quantize = Callable[[Bytes], Bytes]
 type Dequantize = Callable[[Bytes], Bytes]
@@ -106,11 +106,15 @@ class CompressionPipeline[Symbol]:
 
     def sender_pipeline(self, data: Symbols) -> Symbols:
         quantization_index = self.quantize(data)
-        print(f"first 10 bytes of quantization_index: {quantization_index[:10]}")
+        logger.debug(f"first 10 bytes of quantization_index: {quantization_index[:10]}")
         prediction_residual = self.prediction_extract(quantization_index)
-        print(f"first 10 bytes of prediction_residual: {prediction_residual[:10]}")
+        logger.debug(
+            f"first 10 bytes of prediction_residual: {prediction_residual[:10]}"
+        )
         entropy_encoded = self.entropy_encode(prediction_residual)
-        print(f"encoded first 10 bytes of entropy_encoded: {entropy_encoded[:10]}")
+        logger.debug(
+            f"encoded first 10 bytes of entropy_encoded: {entropy_encoded[:10]}"
+        )
         encoded_with_ecc = self.error_correction_integrate(entropy_encoded)
         return encoded_with_ecc  # transmitted data
 
@@ -118,9 +122,13 @@ class CompressionPipeline[Symbol]:
         # Prediction -> Quantize -> Entropy -> ECC -> Transmission
         # Transmission -> ECC -> EntropyDecode -> Dequantize -> Prediction
         entropy_encoded = self.error_correction_extract(encoded_with_ecc)
-        print(f"decoding first 10 bytes of entropy_encoded: {entropy_encoded[:10]}")
+        logger.debug(
+            f"decoding first 10 bytes of entropy_encoded: {entropy_encoded[:10]}"
+        )
         entropy_decoded = self.entropy_decode(entropy_encoded)
-        print(f"decoded first 10 bytes of entropy_decoded: {entropy_decoded[:10]}")
+        logger.debug(
+            f"decoded first 10 bytes of entropy_decoded: {entropy_decoded[:10]}"
+        )
         quantization_index = self.prediction_restore(entropy_decoded)
         reconstructed = self.dequantize(quantization_index)
         return reconstructed
