@@ -51,7 +51,7 @@ if __name__ == "__main__":
     test_int16_bytes_conversion()
 
 
-class NaivePrediction1D:
+class DifferentialPulseCodeModulation1D:
     @staticmethod
     def prediction_extract(data: Bytes) -> Bytes:
         # 1D case:
@@ -75,7 +75,7 @@ class NaivePrediction1D:
         return data
 
 
-class NaiveImagePrediction2D:
+class DifferentialPulseCodeModulation2D:
     """
     Naive 2D image prediction
 
@@ -229,7 +229,7 @@ def test_naive_image_prediction():
     dtype_safe = numpy.int16  # safe data type for prediction
     image_height, image_width, n_band = 1000, 800, 3
 
-    prediction = NaiveImagePrediction2D(
+    prediction = DifferentialPulseCodeModulation2D(
         image_height, image_width, n_band, dtype_in, dtype_safe
     )
 
@@ -271,7 +271,7 @@ def test_naive_image_prediction():
 def test_naive_image_prediction_with_pipeline(file_bytes: Bytes):
     dtype_in, dtype_safe = numpy.uint8, numpy.int16
     image_height, image_width, n_band = 1000, 800, 3
-    prediction = NaiveImagePrediction2D(
+    prediction = DifferentialPulseCodeModulation2D(
         image_height, image_width, n_band, dtype_in, dtype_safe
     )
 

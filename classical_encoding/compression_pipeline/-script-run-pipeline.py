@@ -10,7 +10,9 @@ from classical_encoding.compression_pipeline.classical_pipeline import (
 )
 from classical_encoding.entropy_coding.adaptive_huffman import AdaptiveHuffman
 from classical_encoding.helper.typing import Byte
-from classical_encoding.prediction.basic_prediction import NaiveImagePrediction2D
+from classical_encoding.prediction.basic_prediction import (
+    DifferentialPulseCodeModulation2D,
+)
 from classical_encoding.quantization.uniform_scale_quantization import (
     UniformScaleQuantizer,
 )
@@ -21,7 +23,7 @@ dtype_in, dtype_safe = numpy.uint8, numpy.int16
 
 
 quantizer = UniformScaleQuantizer(q_step=3)
-prediction = NaiveImagePrediction2D(
+prediction = DifferentialPulseCodeModulation2D(
     IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_BANDS, numpy.uint8, numpy.int16
 )
 entropy_coding = AdaptiveHuffman()
