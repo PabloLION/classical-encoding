@@ -3,7 +3,7 @@ This is the implementation of FGK algorithm, which is the first and easier
 adaptive Huffman coding. Vitter's algorithm is more complicated and efficient
 but not necessary for this project.
 """
-from typing import Callable, Generic, Iterator
+from typing import Callable, Generic, Iterable, Iterator
 from typing_extensions import deprecated
 from classical_encoding.helper.logger import logger
 from classical_encoding.helper.byte_tool import BytePacker
@@ -12,7 +12,7 @@ from classical_encoding.helper.data_structure import (
     ExtendedRestrictedFastOrderedList as OrderedList,
     NullableSwappableNode as MetaNode,
 )
-from classical_encoding.helper.typing import Byte, Symbol
+from classical_encoding.helper.typing import Byte, Bytes, Symbol
 
 NYT = 256  # Not Yet Transmitted. One byte cannot hold
 
@@ -256,7 +256,7 @@ class AdaptiveHuffman:
 
         curr = huffman_tree.update_huffman_tree(curr)
 
-        logger.info(f"done encoding {symbol=:3d} ==0b_ {symbol:08b}, {encoded=}")
+        logger.debug(f"done encoding {symbol=:3d} ==0b_ {symbol:08b}, {encoded=}")
         logger.debug(f"new nyt_node path: {huffman_tree.get_nyt_path()}")
         logger.debug(f"new tree: {huffman_tree}")
         return encoded
@@ -311,6 +311,46 @@ class AdaptiveHuffman:
             seen_bits = []
 
         return bytes(decoded_bytes)
+
+    @staticmethod
+    def decode_bytes(
+        bytes: Iterable[Byte],
+    ) -> bytes:
+        """Decode a sequence of bytes.
+        Args:
+            bytes (Iterator[Byte]): the bytes to be decoded
+        Returns:
+            bytes: decoded data
+        """
+        bits = [bit for byte in bytes for bit in Bits.from_int(byte, 8).as_bools()]
+        decoded_bytes = AdaptiveHuffman.decode_bits(iter(bits))
+        return decoded_bytes
+
+    @staticmethod
+    def encode(source: Bytes) -> Bytes:
+        """
+        Encode a sequence of bytes.
+        Just another interface for `encode_bytes` and function overloading.
+
+        Args:
+            source (Bytes): the bytes to be encoded
+        Returns:
+            Bytes: encoded data
+        """
+        return AdaptiveHuffman.encode_bytes(iter(source))
+
+    @staticmethod
+    def decode(source: Bytes) -> Bytes:
+        """
+        Decode a sequence of bytes.
+        Just another interface for `decode_bytes` and function overloading.
+
+        Args:
+            source (Bytes): the bytes to be decoded
+        Returns:
+            Bytes: decoded data
+        """
+        return AdaptiveHuffman.decode_bytes(iter(source))
 
 
 def adaptive_huffman_encoding(source: ByteSource) -> tuple[bytearray, Bits]:

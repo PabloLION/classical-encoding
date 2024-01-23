@@ -1,6 +1,7 @@
 from math import copysign
 
 from classical_encoding.helper.more_math import ceil_div
+from classical_encoding.helper.typing import Bytes
 
 
 class UniformScaleQuantizerForSignedWithDeadZone:
@@ -28,12 +29,18 @@ class UniformScaleQuantizer:
     def __init__(self, q_step: int) -> None:
         self.q_step = q_step
 
-    def quantize(self, x: int) -> int:
+    def quantize_byte(self, x: int) -> int:
         assert 0 <= x < 256, f"Input value must be in range [0, 255], got {x}"
         return x // self.q_step
 
-    def dequantize(self, y: int) -> int:
+    def dequantize_byte(self, y: int) -> int:
         return max(min(255, y * self.q_step + self.q_step // 2), 0)
+
+    def quantize(self, x: Bytes) -> Bytes:
+        return list(map(self.quantize_byte, x))
+
+    def dequantize(self, y: Bytes) -> Bytes:
+        return list(map(self.dequantize_byte, y))
 
 
 def test_uniform_scale_quantizer():
@@ -41,23 +48,23 @@ def test_uniform_scale_quantizer():
     peak_absolute_errors = step // 2
     quantizer = UniformScaleQuantizer(step)
     for x in range(256):
-        reconstructed = quantizer.dequantize(quantizer.quantize(x))
+        reconstructed = quantizer.dequantize_byte(quantizer.quantize_byte(x))
         assert (
             abs(reconstructed - x) <= peak_absolute_errors
         ), f"Quantization error for {x} is too big, got {reconstructed=}"
 
-    assert quantizer.quantize(0) == 0
-    assert quantizer.quantize(1) == 0
-    assert quantizer.quantize(2) == 0
-    assert quantizer.quantize(100) == 33
-    assert quantizer.quantize(255) == 85
-    assert quantizer.dequantize(0) == 1
-    assert quantizer.dequantize(1) == 4
-    assert quantizer.dequantize(2) == 7
-    assert quantizer.dequantize(33) == 100
+    assert quantizer.quantize_byte(0) == 0
+    assert quantizer.quantize_byte(1) == 0
+    assert quantizer.quantize_byte(2) == 0
+    assert quantizer.quantize_byte(100) == 33
+    assert quantizer.quantize_byte(255) == 85
+    assert quantizer.dequantize_byte(0) == 1
+    assert quantizer.dequantize_byte(1) == 4
+    assert quantizer.dequantize_byte(2) == 7
+    assert quantizer.dequantize_byte(33) == 100
     assert (
-        quantizer.dequantize(85) == 255
-    ), f"{quantizer.dequantize(85)=} should not be 256"
+        quantizer.dequantize_byte(85) == 255
+    ), f"{quantizer.dequantize_byte(85)=} should not be 256"
     print("uniform_scale_quantizer tests passed")
 
 

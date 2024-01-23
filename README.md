@@ -3,11 +3,11 @@
 Execute these command in the root of this repository to setup the development environment. If `poetry` is not installed, see <https://python-poetry.org/docs/#installation>.
 
 ```sh
+# install with production dependencies only
 poetry install
 # install with dev dependencies
-poetry install --dev
+poetry install --with=dev
 poetry shell
-
 ```
 
 ## Note

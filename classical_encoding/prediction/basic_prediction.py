@@ -1,7 +1,13 @@
+from pathlib import Path
+from time import time
 from typing import Any
 from unittest import result
 import numpy
-from classical_encoding import TEST_RAW_IMAGE_PATH, TEST_RESULT_FOLDER
+from classical_encoding import (
+    RAW_DATASET_FOLDER,
+    TEST_RAW_IMAGE_PATH,
+    TEST_RESULT_FOLDER,
+)
 from classical_encoding.compression_pipeline.classical_pipeline import (
     CompressionPipeline,
 )
@@ -221,8 +227,11 @@ class NaiveImagePrediction2D:
 def test_naive_image_prediction():
     dtype_in = numpy.uint8  # data type of the raw image
     dtype_safe = numpy.int16  # safe data type for prediction
+    image_height, image_width, n_band = 1000, 800, 3
 
-    prediction = NaiveImagePrediction2D(1000, 800, 3, dtype_in, dtype_safe)
+    prediction = NaiveImagePrediction2D(
+        image_height, image_width, n_band, dtype_in, dtype_safe
+    )
 
     buffer = TEST_RAW_IMAGE_PATH.read_bytes()  # good
     img_list_int = list(buffer)
@@ -259,9 +268,12 @@ def test_naive_image_prediction():
     )
 
 
-def test_naive_image_prediction_with_pipeline(bytes: Bytes):
+def test_naive_image_prediction_with_pipeline(file_bytes: Bytes):
     dtype_in, dtype_safe = numpy.uint8, numpy.int16
-    prediction = NaiveImagePrediction2D(1000, 800, 3, dtype_in, dtype_safe)
+    image_height, image_width, n_band = 1000, 800, 3
+    prediction = NaiveImagePrediction2D(
+        image_height, image_width, n_band, dtype_in, dtype_safe
+    )
 
     pipeline = CompressionPipeline(
         prediction_extract=prediction.extract,
@@ -272,9 +284,30 @@ def test_naive_image_prediction_with_pipeline(bytes: Bytes):
     print("image prediction with pipeline test passed")
 
 
-if __name__ == "__main__":
-    # test_naive_image_prediction()
-
-    file_buffer = TEST_RAW_IMAGE_PATH.read_bytes()  # good
+def test_naive_image_prediction_with_pipeline_given_path(path: Path):
+    file_buffer = path.read_bytes()
     file_bytes = list(file_buffer)
     test_naive_image_prediction_with_pipeline(file_bytes)
+
+
+def test_all_image_with_time():
+    counter = 0
+    current_time = time()
+    for img in RAW_DATASET_FOLDER.iterdir():
+        try:
+            test_naive_image_prediction_with_pipeline_given_path(img)
+        except Exception as e:
+            print(f"{img} failed")
+            raise e
+        print(
+            f"{img} passed in {time() - current_time:.2f}s at {time()}, total passed {counter} of 610"
+        )
+        counter += 1
+
+    print("All tests passed")
+
+
+if __name__ == "__main__":
+    # test_naive_image_prediction()
+    test_naive_image_prediction_with_pipeline_given_path(TEST_RAW_IMAGE_PATH)
+    # test_all_image_with_time() # works but very slow (610*9s=1h30m)
