@@ -3,10 +3,11 @@
 from os import path
 from typing import Iterable, Optional
 from typing_extensions import deprecated
-from venv import logger  # #FIX: check correct logger
+from classical_encoding.helper.logger import logger
 import pydot
 
 from classical_encoding.helper.data_class import Bits
+from classical_encoding.helper.typing import Bytes
 
 
 class BinaryTreeNode:
@@ -25,7 +26,89 @@ class BinaryTreeNode:
         self.right = right
         self.value = value
 
-    # #TODO: serialize tree
+    def max_depth(self, current_depth: int = 1) -> int:
+        # codeword is the path from root to leaf
+        # hence the max codeword length is the depth of the tree
+        if self.value is None:
+            return 0
+        return max(
+            self.left.max_depth(current_depth + 1) if self.left else 0,
+            self.right.max_depth(current_depth + 1) if self.right else 0,
+            current_depth,
+        )
+
+    def serialize(self) -> Bytes:
+        # serialize the tree into bytes
+        # Since every node hold a symbol from 0 to 255, use 00000001+symbol to represent a node
+        # if a node is None, use 00000000_00000000 to represent it
+        # if a node value is none, use 00000000_0000001 to represent it
+        # then we do a pre-order traversal to serialize the tree
+        # store the length in bytes of the serialized tree in the first two bytes
+
+        tree_bytes = list()
+
+        def pre_order_serialization(node: BinaryTreeNode | None):
+            if node is None:
+                tree_bytes.append(0)
+                tree_bytes.append(0)
+            else:
+                if node.value is None:
+                    tree_bytes.append(0)
+                    tree_bytes.append(1)
+                else:
+                    tree_bytes.append(1)
+                    tree_bytes.append(node.value)
+                pre_order_serialization(node.left)
+                pre_order_serialization(node.right)
+
+        pre_order_serialization(self)
+        return [len(tree_bytes) // 256, len(tree_bytes) % 256] + tree_bytes
+
+    @classmethod
+    def deserialize(cls, tree_bytes: Bytes) -> "BinaryTreeNode":
+        # deserialize the tree from bytes
+        # the first two bytes are the length of the tree in bytes
+        # then we do a pre-order traversal to deserialize the tree
+        # if the node is 00000000_00000000, it is None
+        # if the node is 00000000_00000001, it is a node with value None
+        # if the node is 00000001+symbol, it is a node with value symbol
+        # then we do a pre-order traversal to serialize the tree
+
+        tree_length = tree_bytes[0] * 256 + tree_bytes[1]
+        assert tree_length == len(tree_bytes) - 2
+        tree_bytes = tree_bytes[2:]
+
+        def build_tree(index: int) -> tuple[BinaryTreeNode | None, int]:
+            if index >= len(tree_bytes):
+                return None, index
+
+            flag = tree_bytes[index]
+            index += 1
+
+            if flag == 0:  # Node is None or Node value is None
+                next_flag = tree_bytes[index]
+                index += 1
+                if next_flag == 0:
+                    return None, index  # Node is None
+                elif next_flag == 1:
+                    node = BinaryTreeNode(None)  # Node value is None
+                    node.left, index = build_tree(index)
+                    node.right, index = build_tree(index)
+                    return node, index
+            elif flag == 1:  # Node with value
+                value = tree_bytes[index]
+                index += 1
+                node = BinaryTreeNode(value)
+                node.left, index = build_tree(index)
+                node.right, index = build_tree(index)
+                return node, index
+            else:
+                raise ValueError("Invalid flag")
+            raise ValueError("Invalid flag")
+
+        root, _ = build_tree(0)
+        assert root is not None
+        return root
 
 
 class RestrictedFastOrderedList:

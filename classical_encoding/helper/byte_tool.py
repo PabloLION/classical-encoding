@@ -3,6 +3,7 @@ from typing import Iterator
 from typing_extensions import deprecated
 
 from classical_encoding.helper.data_class import Bits
+from classical_encoding.helper.typing import Bytes
 
 
 @deprecated("Use ``Bits.as_bytes()`` instead")
@@ -16,6 +17,60 @@ def int8_to_bytes(bits: Bits) -> bytearray:
         sum(bit << (7 - i) for i, bit in enumerate(bits[j : j + 8]))  # Big Endian
         for j in range(0, len(bits), 8)
     )
+
+
+class BetterBytePacker:
+    bits: list[bool]
+    packed: bytearray
+
+    def __init__(self):
+        self.bits = list()
+        self.packed = bytearray()
+
+    def pack_bits(self, bits: Bits) -> None:
+        assert len(bits) > 0, f"bits is empty"
+        self.bits.extend(bits)
+        if len(self.bits) >= 8:
+            group_until = len(self.bits) - len(self.bits) % 8
+            new_bytes = Bits.from_bools(self.bits[:group_until]).as_bytes()
+            self.packed.extend(new_bytes)
+            self.bits = self.bits[group_until:]
+
+    def pack_int(self, n: int, bit_length: int) -> None:
+        # optional `bit_length` doesn't make sense, huffman tree can have
+        # both leading "right"s and leading "left"s at the same time
+        return self.pack_bits(Bits.from_int(n, bit_length))
+
+    def flush(self) -> Bytes:
+        """
+        first 4 bytes indicates the length of the bits in tree
+        """
+        l = len(self.bits)
+        padding = 8 - l % 8
+        if padding != 8:
+            self.bits.extend([False] * padding)
+        output = bytearray(Bits.from_int(l, 32).as_bytes())
+        output.extend(Bits.from_bools(self.bits).as_bytes())
+
+        self.bits = list()
+        self.packed = bytearray()
+        return output
+
+    @classmethod
+    def unpack_bytes_to_bits(cls, byte_list: Bytes) -> Bits:
+        """
+        first 4 bytes indicates the length of the bits in tree
+        """
+        byte_pack = cls()
+        bits_length = (
+            Bits.from_int(byte_list[0], 8)
+            + Bits.from_int(byte_list[1], 8)
+            + Bits.from_int(byte_list[2], 8)
+            + Bits.from_int(byte_list[3], 8)
+        ).as_int()
+        for byte in byte_list[4:]:
+            byte_pack.bits.extend(Bits.from_int(byte, 8))
+        return Bits.from_bools(byte_pack.bits[:bits_length])
 
 
 class BytePacker:
