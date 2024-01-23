@@ -7,6 +7,7 @@ import numpy
 from classical_encoding import RAW_DATASET_FOLDER
 from classical_encoding.compression_pipeline.classical_pipeline import (
     CompressionPipeline,
+    Quantize,
 )
 from classical_encoding.entropy_coding.naive_huffman import (
     naive_huffman_decode_from_bytes,
@@ -25,9 +26,10 @@ from classical_encoding.helper.logger import logger
 # Params for the pipeline
 IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_BANDS = 1000, 800, 3
 dtype_in, dtype_safe = numpy.uint8, numpy.int16
+QUANTIZATION_STEP = 7
 
 
-quantizer = UniformScaleQuantizer(q_step=3)
+quantizer = UniformScaleQuantizer(q_step=QUANTIZATION_STEP)
 prediction = DifferentialPulseCodeModulation2D(
     IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_BANDS, numpy.uint8, numpy.int16
 )
@@ -50,10 +52,11 @@ t = time()
 finished = 0
 file_path_list = list(RAW_DATASET_FOLDER.iterdir())
 total = len(file_path_list)
-interested_img_count = 20
+interested_img_range = slice(20, 80)
+interested_img_count = len(file_path_list[interested_img_range])
 
-logger.info(f"running test on first {interested_img_count} images")
-for img in file_path_list[:interested_img_count]:
+logger.info(f"running test on {interested_img_count} images")
+for img in file_path_list[interested_img_range]:
     try:
         logger.debug(f"Testing image {finished}/{interested_img_count} at {img}")
         img_buffer = img.read_bytes()
@@ -76,6 +79,6 @@ for img in file_path_list[:interested_img_count]:
         raise Exception(f"{img} failed")
     print(f"{img} passed")
 
-print(pipeline.metrics)
+pipeline.dump_metrics_result()
 pipeline.show_metrics_result()
 print("All tests passed")

@@ -37,3 +37,7 @@ RAW_DATASET_FOLDER = DATASET_FOLDER / "raw"
 assert RAW_DATASET_FOLDER.exists()
 assert RAW_DATASET_FOLDER.is_dir()
 assert len(listdir(RAW_DATASET_FOLDER)) == 610  # we have 610 raw images
+
+# output
+OUTPUT_FOLDER = PACKAGE_ROOT / "compression_pipeline" / "test-result"
+OUTPUT_FOLDER.mkdir(exist_ok=True)

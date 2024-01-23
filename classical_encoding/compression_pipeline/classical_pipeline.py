@@ -1,6 +1,10 @@
+from datetime import datetime
+import json
+from time import time
 from typing import Any, Callable, Generic, NamedTuple, Optional
 
 from matplotlib.pylab import f
+from classical_encoding import OUTPUT_FOLDER
 from classical_encoding.metrics.print_metric import calculate_metrics
 from classical_encoding.metrics.rate_distortion_plot import (
     plot_rate_distortion,
@@ -148,8 +152,16 @@ class CompressionPipeline[Symbol]:
     def show_metrics_result(self):
         plot_rate_distortion(self.metrics)
         for m in self.metrics:
-            print(m)
+            logger.info(m)
             # or do something else with m
+
+    def dump_metrics_result(self):
+        execution_time_stamp = time()
+        dt_object = datetime.fromtimestamp(execution_time_stamp)
+        formatted_time = dt_object.strftime("%Y%m%d-%H%M%S")
+        json.dump(
+            self.metrics, open(OUTPUT_FOLDER / f"metrics_{formatted_time}.json", "w")
+        )
 
 
 def test_default_pipeline():
