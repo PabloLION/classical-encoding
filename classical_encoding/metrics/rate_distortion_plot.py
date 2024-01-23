@@ -1,9 +1,10 @@
 from typing import NamedTuple
 import matplotlib.pyplot as plt
 from classical_encoding.helper.typing import Metrics
+from classical_encoding.metrics.print_metric import MetricsHandle
 
 
-def plot_rate_distortion(metrics: list[Metrics]):
+def plot_rate_distortion(metrics: list[Metrics] | MetricsHandle):
     bps_list = [m.bps for m in metrics]
     psnr_list = [m.psnr for m in metrics]
     plt.figure()

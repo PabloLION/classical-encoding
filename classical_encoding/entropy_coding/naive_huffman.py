@@ -115,6 +115,7 @@ def naive_huffman_encode_to_bytes(data_bytes: Bytes) -> Bytes:
     assert len(packed_bits) % 8 == 0, "packed_bits should be multiple of 8"
 
     # make valid_bits_count to be the first 4 bytes
+    assert valid_bits_count < 2**32, f"{valid_bits_count=} is too big for 4 bytes"
     first_4_bytes = Bits.from_int(valid_bits_count, 32).as_bytes()
     assert len(first_4_bytes) == 4, "first_4_bytes should be 4 bytes"
     packer.extend(first_4_bytes)

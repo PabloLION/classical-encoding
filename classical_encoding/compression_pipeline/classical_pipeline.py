@@ -5,7 +5,7 @@ from typing import Any, Callable, Generic, NamedTuple, Optional
 
 from matplotlib.pylab import f
 from classical_encoding import OUTPUT_FOLDER
-from classical_encoding.metrics.print_metric import calculate_metrics
+from classical_encoding.metrics.print_metric import MetricsHandle, calculate_metrics
 from classical_encoding.metrics.rate_distortion_plot import (
     plot_rate_distortion,
 )
@@ -77,7 +77,7 @@ class CompressionPipeline[Symbol]:
     transmission_send: TransmissionSend
     transmission_receive: TransmissionReceive
     compression_metrics: CompressionMetrics
-    metrics: list[Metrics]
+    metrics_handle: MetricsHandle
 
     def __init__(
         self,
@@ -106,7 +106,7 @@ class CompressionPipeline[Symbol]:
         self.transmission_send = transmission_send
         self.transmission_receive = transmission_receive
         self.compression_metrics = compression_metrics
-        self.metrics = []
+        self.metrics = MetricsHandle()
 
     def sender_pipeline(self, data: Symbols) -> Symbols:
         quantization_index = self.quantize(data)
@@ -167,7 +167,7 @@ class CompressionPipeline[Symbol]:
 def test_default_pipeline():
     pipeline = CompressionPipeline[Byte]()
     data = b"Hello World!"
-    reconstructed, metrics = pipeline.run(data)
+    reconstructed, _metrics = pipeline.run(data)
     assert reconstructed == data
     print("test_default_pipeline passed")
 
