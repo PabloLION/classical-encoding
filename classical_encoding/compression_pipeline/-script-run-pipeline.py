@@ -14,6 +14,7 @@ from classical_encoding.entropy_coding.naive_huffman import (
     naive_huffman_encode_to_bytes,
 )
 from classical_encoding.helper.typing import Byte
+from classical_encoding.metrics.print_metric import calculate_metrics
 from classical_encoding.prediction.basic_prediction import (
     DifferentialPulseCodeModulation2D,
 )
@@ -42,14 +43,16 @@ pipeline = CompressionPipeline[Byte](
     # ecc_extract = # not implemented
     # transmission_send = # not implemented
     # transmission_receive = # not implemented
-    # compression_metrics = @JJSUN
+    compression_metrics=calculate_metrics,
 )
 
 t = time()
 finished = 0
-total = len(list(RAW_DATASET_FOLDER.iterdir()))
+file_path_list = list(RAW_DATASET_FOLDER.iterdir())
+total = len(file_path_list)
+interested_img_count = 20
 
-for img in RAW_DATASET_FOLDER.iterdir():
+for img in file_path_list[interested_img_count:]:
     try:
         print(f"Testing image {finished}/{total} at {img}")
         img_buffer = img.read_bytes()
@@ -68,5 +71,6 @@ for img in RAW_DATASET_FOLDER.iterdir():
     except Exception as e:
         raise Exception(f"{img} failed")
     print(f"{img} passed")
+
 
 print("All tests passed")

@@ -61,12 +61,6 @@ def fake_prediction_restore(data: Symbols) -> Symbols:
     return data
 
 
-def my_compression_metrics(
-    raw_data: Bytes, transmitted: Bytes, reconstructed: Bytes
-) -> Metrics:
-    return calculate_metrics(raw_data, transmitted, reconstructed)
-
-
 class CompressionPipeline[Symbol]:
     quantize: Quantize
     dequantize: Dequantize
@@ -95,7 +89,7 @@ class CompressionPipeline[Symbol]:
         transmission_send: TransmissionSend = fake_transmission_send,
         transmission_receive: TransmissionReceive = fake_transmission_receive,
         # compression_metrics: CompressionMetrics = lambda _raw, _transmitted: None,
-        compression_metrics: CompressionMetrics = my_compression_metrics,
+        compression_metrics: CompressionMetrics = calculate_metrics,
     ):
         self.quantize = quantize
         self.dequantize = dequantize
